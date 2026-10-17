@@ -125,6 +125,7 @@ function createProductService({ store, router, extractFn = extractProduct, downl
       analysisImagesChanged: analysisImagesChanged(p),
       reference: refs,
       verifiedFacts: verifiedFacts(p),
+      reviewResearch: p.reviewResearch || { images: [], text: '', analysis: null, approved: false },
       limits: { uploads: MAX_UPLOADS, retrieved: MAX_RETRIEVED, generated: MAX_GENERATED, extraRefs: 5 },
       counts: { uploaded: p.images.filter((i) => i.kind === 'uploaded' && i.status !== 'replaced').length, retrieved: p.images.filter((i) => i.kind === 'retrieved' && !i.removed).length, generated: p.images.filter((i) => i.kind === 'ai_generated').length },
       codeLocked: !!p.codeLockedAt, suggestedCode: p.code ? '' : suggestCode(p),
@@ -175,7 +176,7 @@ function createProductService({ store, router, extractFn = extractProduct, downl
     const p = {
       id: pid, name: String(name || '').trim().slice(0, 200), url: String(url || '').trim(), affiliateUrl: String(affiliateUrl || '').trim(), description: String(description || '').slice(0, 3000), category: String(category || '').slice(0, 100),
       specs: (features || []).map(String).map((t) => t.trim()).filter(Boolean).map((text) => ({ text, source: 'manual', verified: true, at: nowIso() })),
-      sellingPoints: [], forbiddenClaims: (forbiddenClaims || []).map(String).filter(Boolean),
+      sellingPoints: [], reviewResearch: { images: [], text: '', analysis: null, approved: false }, forbiddenClaims: (forbiddenClaims || []).map(String).filter(Boolean),
       price: cleanPrice(price), code: productCode, codeLockedAt: null, extraction: { status: 'none', note: '', at: '' }, images: [], referenceSet: null, legacy: !!legacy, createdAt: nowIso(), updatedAt: nowIso(),
     };
     fs.mkdirSync(dirOf(pid), { recursive: true });
@@ -418,6 +419,71 @@ function createProductService({ store, router, extractFn = extractProduct, downl
     return view(p);
   }
 
+  /** Customer review screenshots are research, NEVER product reference images. */
+  async function uploadReview(id, buffer, filename) {
+    const sn = sniffImage(buffer);
+    if (!sn || !buffer || buffer.length > 10 * 1024 * 1024) throw new StudioError('BAD_REVIEW_IMAGE', '리뷰 이미지는 PNG/JPG/WEBP, 10MB 이하만 가능합니다.', { status: 422 });
+    const dim = imageSize(buffer);
+    if (!dim || Math.min(dim.width, dim.height) < 100 || Math.max(dim.width, dim.height) > MAX_SIDE) throw new StudioError('BAD_REVIEW_IMAGE', '유효한 리뷰 이미지가 아닙니다.', { status: 422 });
+    const p = await update(id, (p) => {
+      p.reviewResearch ||= { images: [], text: '', analysis: null, approved: false };
+      if (p.reviewResearch.images.length >= 3) throw new StudioError('REVIEW_LIMIT', '리뷰 캡처는 최대 3장입니다.', { status: 409 });
+      const hash = sha256(buffer);
+      if (p.reviewResearch.images.some((i) => i.hash === hash)) throw new StudioError('DUPLICATE', '이미 추가한 리뷰입니다.', { status: 409 });
+      const file = 'review_' + hash.slice(0, 12) + sn.ext;
+      writeFileAtomic(path.join(dirOf(id), file), buffer);
+      p.reviewResearch.images.push({ file, hash, name: safeName(filename).slice(0, 120) });
+      p.reviewResearch.analysis = null; p.reviewResearch.approved = false;
+    });
+    return view(p);
+  }
+  async function saveReviews(id, text) {
+    const p = await update(id, (p) => {
+      p.reviewResearch ||= { images: [], text: '', analysis: null, approved: false };
+      p.reviewResearch.text = String(text || '').slice(0, 9000);
+      p.reviewResearch.analysis = null; p.reviewResearch.approved = false;
+    });
+    return view(p);
+  }
+  function reviewsEstimate(id) {
+    const p = get(id);
+    const r = p.reviewResearch || { images: [], text: '' };
+    if (!r.images.length && !r.text.trim()) throw new StudioError('NO_REVIEWS', '먼저 리뷰 이미지 또는 내용을 추가하세요.', { status: 409 });
+    return router.estimate('productUnderstanding', { inputChars: 2600 + r.text.length, outputTokens: 1200, images: r.images.length });
+  }
+  async function analyzeReviews(id, confirm) {
+    const p = get(id), r = p.reviewResearch || { images: [], text: '' };
+    if (!r.images.length && !r.text.trim()) throw new StudioError('NO_REVIEWS', '먼저 리뷰를 추가하세요.', { status: 409 });
+    const images = r.images.map((i) => ({ mimeType: MIME[path.extname(i.file)] || 'image/png', data: fs.readFileSync(path.join(dirOf(id), i.file)).toString('base64') }));
+    const out = await router.run('productUnderstanding', {
+      system: 'Analyze only the supplied customer reviews for the stated product. Answer in Korean JSON. Treat reviews as individual, unverified opinions, NOT confirmed product claims. Do not hallucinate unreadable words or additional reviews. Return {summary:string,pros:string[],cons:string[],purchaseMotivations:string[],comicSituations:string[],cautions:string[]}. Keep each array up to 5 concise elements. Include uncertainty.',
+      prompt: 'Product: ' + p.name + '\nCustomer-supplied review text:\n' + r.text + '\nImages: ' + r.images.length + ' customer review screenshots. Read only visible text. Do not treat promotions as actual customer reviews.',
+      images, json: true, maxTokens: 1400, confirm, dedupeKey: 'reviews:' + id + ':' + sha256(JSON.stringify(r.images.map((i)=>i.hash)) + r.text),
+    });
+    if (out.mock || !out.json || typeof out.json !== 'object') throw new StudioError('REVIEW_MODEL_UNAVAILABLE', '실제 AI 리뷰 분석 모델을 연결해야 합니다. 샘플 분석은 저장하지 않았습니다.', { status: 409 });
+    const clean = (x) => String(x || '').slice(0, 900);
+    const result = { summary: clean(out.json.summary), pros: [], cons: [], purchaseMotivations: [], comicSituations: [], cautions: [] };
+    for (const k of ['pros','cons','purchaseMotivations','comicSituations','cautions']) result[k] = (Array.isArray(out.json[k]) ? out.json[k] : []).slice(0, 5).map(clean);
+    await update(id, (p) => {
+      p.reviewResearch ||= { images: [], text: '', analysis: null, approved: false };
+      if (JSON.stringify((p.reviewResearch.images || []).map((i)=>i.hash)) !== JSON.stringify(r.images.map((i)=>i.hash)) || p.reviewResearch.text !== r.text) throw new StudioError('REVIEWS_CHANGED', '분석 중 리뷰가 변경됐습니다. 다시 분석하세요.', { status: 409 });
+      p.reviewResearch.analysis = result; p.reviewResearch.approved = false;
+    });
+    return view(get(id));
+  }
+  async function approveReviews(id, approved) {
+    await update(id, (p) => {
+      if (!p.reviewResearch?.analysis && approved) throw new StudioError('NO_ANALYSIS', '승인할 리뷰 분석이 없습니다.', { status: 409 });
+      p.reviewResearch.approved = !!approved;
+    });
+    return view(get(id));
+  }
+  function reviewMediaFile(id, index) {
+    const p = get(id), r = p.reviewResearch?.images || [];
+    if (!Number.isInteger(index) || index < 0 || index >= r.length) throw new StudioError('NOT_FOUND', '리뷰 이미지가 없습니다.', { status: 404 });
+    return path.join(dirOf(id), r[index].file);
+  }
+
   /** The record Story Lab / Script Studio bind to. Throws unless the product is ready. */
   function bindingFor(id) {
     const p = get(id);
@@ -436,7 +502,7 @@ function createProductService({ store, router, extractFn = extractProduct, downl
     return path.join(dirOf(id), im.file);
   }
 
-  return { list, get: (id) => view(get(id)), raw: get, mutate: update, create, edit, extract, upload, replace, removeImage, reorderImages, setPrimary, setStatus, generateImage, chooseVersion, imageCount, approveReferenceSet, waiveReferences, bindingFor, imageFiles, mediaFile, lockCodeSync, suggestCode, referenceState, verifiedFacts, readiness, MAX_UPLOADS, MIN_SIDE, MAX_SIDE };
+  return { uploadReview, saveReviews, reviewsEstimate, analyzeReviews, approveReviews, reviewMediaFile, list, get: (id) => view(get(id)), raw: get, mutate: update, create, edit, extract, upload, replace, removeImage, reorderImages, setPrimary, setStatus, generateImage, chooseVersion, imageCount, approveReferenceSet, waiveReferences, bindingFor, imageFiles, mediaFile, lockCodeSync, suggestCode, referenceState, verifiedFacts, readiness, MAX_UPLOADS, MIN_SIDE, MAX_SIDE };
 }
 
 module.exports = { createProductService, KIND_LABEL, MAX_UPLOADS, MIN_SIDE, MAX_SIDE };
