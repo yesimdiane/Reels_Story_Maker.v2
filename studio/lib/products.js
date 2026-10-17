@@ -262,6 +262,7 @@ function createProductService({ store, router, extractFn = extractProduct, downl
     const p = await update(id, (p) => {
       if (!buffer || !buffer.length) throw new StudioError('EMPTY_FILE', '빈 파일입니다.', { status: 400 });
       if (p.images.filter((i) => i.kind === 'uploaded' && i.status !== 'replaced').length >= MAX_UPLOADS) throw new StudioError('UPLOAD_LIMIT', `업로드는 최대 ${MAX_UPLOADS}장입니다. 기존 이미지를 삭제하거나 교체하세요.`, { status: 409 });
+      if (p.images.filter((i) => i.kind === 'uploaded' && !i.removed && i.status !== 'replaced').length + (p.reviewResearch?.images || []).length >= 10) throw new StudioError('UPLOAD_LIMIT', '제품과 리뷰 이미지는 합쳐 최대 10장입니다.', { status: 409 });
       saveImage(p, id, { buffer, filename, kind: 'uploaded', label, extra: { source: ['paste', 'drop', 'file', 'crop'].includes(source) ? source : 'file' } });
     });
     return view(p);
@@ -427,7 +428,7 @@ function createProductService({ store, router, extractFn = extractProduct, downl
     if (!dim || Math.min(dim.width, dim.height) < 100 || Math.max(dim.width, dim.height) > MAX_SIDE) throw new StudioError('BAD_REVIEW_IMAGE', '유효한 리뷰 이미지가 아닙니다.', { status: 422 });
     const p = await update(id, (p) => {
       p.reviewResearch ||= { images: [], text: '', analysis: null, approved: false };
-      if (p.reviewResearch.images.length >= 3) throw new StudioError('REVIEW_LIMIT', '리뷰 캡처는 최대 3장입니다.', { status: 409 });
+      if (p.reviewResearch.images.length + p.images.filter((i) => i.kind === 'uploaded' && !i.removed && i.status !== 'replaced').length >= 10) throw new StudioError('REVIEW_LIMIT', '제품과 리뷰 이미지는 합쳐 최대 10장입니다.', { status: 409 });
       const hash = sha256(buffer);
       if (p.reviewResearch.images.some((i) => i.hash === hash)) throw new StudioError('DUPLICATE', '이미 추가한 리뷰입니다.', { status: 409 });
       const file = 'review_' + hash.slice(0, 12) + sn.ext;
