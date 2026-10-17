@@ -1,0 +1,14 @@
+# Local API credentials and environment files (never commit)
+.env
+.env.*
+!.env.example
+!.env.*.example
+renderer/.env
+renderer/.env.*
+!renderer/.env.example
+*.keys.env
+*.secrets.env
+secrets/
+# Local artifacts
+node_modules/
+.DS_Store
