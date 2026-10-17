@@ -22,6 +22,16 @@ function parts() {
   // one container per Settings sub-tab; nothing was dropped, the former single "general" page is just split across them
   const sec = { general: box(), connections: box(), costs: box() };
 
+  sec.general.append(h('div', { class: 'card stack', style: 'gap:10px', 'data-output-language': '' },
+    h('h2', null, 'AI 분석 결과 표시 언어'),
+    h('p', { class: 'small muted' }, '제품 분석의 요약은 선택한 언어로 표시합니다. 이미지·영상 생성용 원본 프롬프트와 제품 구조 설명은 정확성을 위해 영어로 유지합니다.'),
+    h('select', { 'aria-label': '결과 표시 언어', onchange: (e) => {
+      state.outputLanguage = e.target.value;
+      try { localStorage.setItem('rf.outputLanguage', e.target.value); } catch (_) {}
+      toast('표시 언어를 저장했습니다. 다음 제품 분석부터 적용됩니다.');
+    } }, [
+      ['ko', '한국어'], ['en', 'English']
+    ].map(([value, label]) => h('option', { value, selected: state.outputLanguage === value }, label)))));
   // Providers (status overview)
   sec.general.append(h('div', { class: 'grid two' },
     h('div', { class: 'card' }, h('h2', null, '영상 생성 (Muapi)'),

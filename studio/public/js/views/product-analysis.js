@@ -47,11 +47,11 @@ function draw(p, a, ui, rerender) {
     ui.open = true;
     const ids = [...picked];
     let est;
-    try { est = await api.post(`/api/products/${p.id}/analysis/estimate`, { imageIds: ids.length ? ids : undefined }); } catch (e) { return toast(e.message, { error: true, recovery: e.recovery }); }
+    try { est = await api.post(`/api/products/${p.id}/analysis/estimate`, { imageIds: ids.length ? ids : undefined, language: state.outputLanguage || 'ko' }); } catch (e) { return toast(e.message, { error: true, recovery: e.recovery }); }
     const c = await confirmPaid({ title: a.approved ? '제품 이미지를 다시 분석 (새 버전)' : '제품 이미지 AI 분석', est, confirmLabel: '분석하기',
       body: h('div', { class: 'stack small', style: 'gap:6px' }, h('div', null, `제품 사진 ${est.imageCount}장을 읽고 영어 구조 설명 초안(v${((a.latest && a.latest.v) || 0) + 1})을 만듭니다.`), h('div', { class: 'muted' }, '결과는 초안으로만 저장되며 승인하기 전에는 스토리보드 생성에 쓰이지 않습니다. 기존 승인본은 바뀌지 않습니다.')) });
     if (c === null) return;
-    try { await api.post(`/api/products/${p.id}/analysis/generate`, { imageIds: ids.length ? ids : undefined, confirm: c }); ui.v = null; ui.text = null; toast('구조 설명 초안을 만들었습니다. 내용을 확인하고 틀린 부분을 고친 뒤 승인하세요.'); } catch (e) { toast(e.message, { error: true, recovery: e.recovery }); }
+    try { await api.post(`/api/products/${p.id}/analysis/generate`, { imageIds: ids.length ? ids : undefined, confirm: c, language: state.outputLanguage || 'ko' }); ui.v = null; ui.text = null; toast('구조 설명 초안을 만들었습니다. 내용을 확인하고 틀린 부분을 고친 뒤 승인하세요.'); } catch (e) { toast(e.message, { error: true, recovery: e.recovery }); }
     await rerender();
   } }, a.versions.length ? '비용 확인 후 새로 분석하기' : '비용 확인 후 분석하기');
   wrap.append(h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' }, analyze, h('span', { class: 'small muted' }, a.current ? `이미지 세트 ${a.current.imageSetVersion ? 'V' + a.current.imageSetVersion : '새 세트(V' + a.current.nextImageSetVersion + ')'} · 분석은 비용 확인 후에만 시작됩니다` : '')));
@@ -81,6 +81,10 @@ function draw(p, a, ui, rerender) {
     shown.sample ? h('div', { class: 'banner warn', 'data-analysis-sample': '' }, h('div', null, '이 초안은 샘플입니다. 실제 제품 사진을 분석한 결과가 아니므로 샘플 문구를 지우고 직접 확인한 내용으로 고쳐 쓰기 전에는 승인할 수 없습니다.')) : null,
     !shown.intact ? h('div', { class: 'banner warn' }, h('div', null, `이 분석(v${shown.v})을 만든 뒤 제품 이미지가 바뀌었습니다. 새로 분석한 뒤 승인하세요.`)) : null,
     h('div', { class: 'small muted' }, '[VERIFIED] = 사진에서 분명히 보이는 것 · [UNCERTAIN] = 추정이거나 일부만 보이는 것(사실로 취급하지 않음). AI가 틀릴 수 있으니 제품 사진과 비교해 고쳐 주세요. 치수·소재·숨은 기능을 지어내지 마세요.'),
+    shown.localizedSummary ? h('div', { class: 'card flat stack', style: 'gap:5px', 'data-localized-summary': '' },
+      h('b', null, 'AI 분석 요약 · ' + ({ ko:'한국어', en:'English' }[shown.displayLanguage] || shown.displayLanguage)),
+      h('p', { style: 'white-space:pre-wrap;margin:0' }, shown.localizedSummary)) : null,
+    h('div', { class: 'small muted' }, '아래 영어 설명은 이미지 생성 AI로 전달되는 기준 프롬프트입니다. 표시 언어와 무관하게 영어로 유지됩니다.'),
     ta,
     h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' }, save, approve),
     approvedHere ? h('div', { class: 'small', style: 'color:var(--sage-deep)' }, '이 승인본은 스토리보드 이미지(제품이 나오는 장면)를 만들 때 제품 참조 이미지와 함께 영어 프롬프트에 자동으로 들어갑니다. 이미 승인된 장면 이미지는 자동으로 다시 만들어지지 않습니다.') : null));

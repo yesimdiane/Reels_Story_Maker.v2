@@ -3,7 +3,7 @@ import { api } from './api.js';
 import { toast } from './ui.js';
 
 const NO_EPISODE_VIEWS = ['overview', 'episodes', 'settings', 'products', 'storylab'];
-export const state = { summary: null, episode: null, episodeId: localStorage.getItem('rf.episode') || '', productId: localStorage.getItem('rf.product') || '', view: 'overview', draft: {}, settingsTab: 'general' };
+export const state = { summary: null, episode: null, episodeId: localStorage.getItem('rf.episode') || '', productId: localStorage.getItem('rf.product') || '', view: 'overview', draft: {}, settingsTab: 'general', outputLanguage: localStorage.getItem('rf.outputLanguage') || 'ko' };
 export const hooks = { rerender: () => {} };
 
 export function go(view, episodeId) {
@@ -35,15 +35,31 @@ export async function selectEpisode(id) {
 
 /** Runs an action, shows errors with recovery steps, and swaps in the returned episode. */
 export async function act(fn, { ok = '' } = {}) {
+  const keep = state.view === 'products' ? {
+    y: window.scrollY,
+    folds: [...document.querySelectorAll('[data-unified-product-intake] details, [data-product-analysis-results] details')]
+      .map((el, i) => ({ key: el.getAttribute('data-fold') || String(i), open: el.open }))
+  } : null;
+  const restore = () => {
+    if (!keep) return;
+    requestAnimationFrame(() => {
+      const nodes = [...document.querySelectorAll('[data-unified-product-intake] details, [data-product-analysis-results] details')];
+      nodes.forEach((el, i) => {
+        const saved = keep.folds.find((x) => x.key === (el.getAttribute('data-fold') || String(i)));
+        if (saved) el.open = saved.open;
+      });
+      window.scrollTo(0, keep.y);
+    });
+  };
   try {
     const r = await fn();
     if (r && r.id && r.derived) await setEpisode(r);
-    else { await refresh(); hooks.rerender(); }
+    else { await refresh(); hooks.rerender(); restore(); }
     if (ok) toast(ok);
     return r;
   } catch (e) {
     toast(e.message, { error: true, recovery: e.recovery });
-    try { await refresh(); hooks.rerender(); } catch { /* ignore */ }
+    try { await refresh(); hooks.rerender(); restore(); } catch { /* ignore */ }
     return null;
   }
 }

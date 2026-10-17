@@ -10,7 +10,7 @@
 const fs = require('node:fs');
 const { StudioError, nowIso, sha256, canonical } = require('./util');
 
-const MAX_ANALYSIS_IMAGES = 4;
+const MAX_ANALYSIS_IMAGES = 5;
 const MAX_TEXT = 8000;
 const MAX_ITEM = 400;
 const SECTIONS = [
@@ -21,6 +21,8 @@ const SECTIONS = [
   ['proportions', 'RELATIVE PROPORTIONS'],
   ['mounting', 'MOUNTING AND INSTALLATION FEATURES'],
   ['details', 'DISTINGUISHING VISUAL DETAILS'],
+  ['labels_text', 'EXACT VISIBLE BRAND LOGO AND CONTROL LABELS'],
+  ['usage', 'DOCUMENTED PRODUCT FUNCTIONS (WITH SOURCE AND UNCERTAINTY)'],
 ];
 const FIXED_NEGATIVES = [
   'Do not change the number, size or arrangement of any component, compartment or divider listed above.',
@@ -28,19 +30,25 @@ const FIXED_NEGATIVES = [
   'Do not add handles, buttons, logos, text, patterns, accessories or any feature that is not listed as verified.',
   'Do not redesign, restyle, simplify, merge or substitute a different product, and do not "improve" the product.',
 ];
+// Keep canonical generation descriptions in English; localize the display summary only.
 const SAMPLE_MARK = '[SAMPLE — NOT AN ANALYSIS OF THIS PRODUCT]';
 
 const SYSTEM = [
-  'You are a meticulous product photo analyst. You receive one or more REFERENCE PHOTOS of the same physical product.',
-  'Write a factual structure description that an image generation model can follow to redraw the SAME product without morphing it.',
-  'RULES: describe ONLY what is actually visible. Count components exactly as visible; if the count is unclear (occluded, cropped, ambiguous), say so and mark it uncertain.',
-  'Never invent dimensions, weights, materials, brand names, internal mechanisms, hidden parts or features. Give a number only when it is clearly printed or countable; otherwise describe relative proportions in words (e.g. "about twice as tall as wide") and mark them uncertain unless the photo makes them evident.',
-  'Use plain, specific English. Every statement is either "verified" (clearly visible in at least one photo) or "uncertain" (inferred, partially visible, or inconsistent between photos).',
-  'Answer with ONE JSON object only (no markdown) of this exact shape:',
-  '{"component_count":{"count":<integer or null>,"basis":"<what exactly was counted>","certain":<true|false>},',
-  ' "items":[{"section":"shape|components|color_material|compartments|proportions|mounting|details","statement":"<one short factual sentence>","status":"verified|uncertain"}],',
-  ' "not_visible":["<things a viewer cannot see in these photos, e.g. the back side, the inside, the underside>"],',
-  ' "negative_constraints":["<product-specific things an artist must NOT do to avoid morphing this product>"]}',
+  'ROLE: Senior product research analyst and image-reference art director for a short-form shopping reel.',
+  'INPUT: 1-5 product screenshots plus optional product name, product description and operator-confirmed specifications. Analyze all screenshots as one product. A screenshot may be a collage or contain sales claims. Never guess unreadable text.',
+  'GOAL A — VISUAL LOCK: Precisely describe the product for consistent image generation: silhouette, proportions, finish, color, handles, lid, seams, control-panel geometry, screen, buttons, logo position and camera-view differences. Record exact visible Korean/English labels where legible; otherwise mark unreadable, never invent.',
+  'GOAL B — FUNCTIONS: Separate visible controls/text, operator-provided verified specifications, and unverified marketing claims. A control label is not proof of a performance claim. Never infer hidden hardware, inner materials, safety certifications, speed, warranty or recipe quantities.',
+  'GOAL C — CREATIVE VALUE: Identify visual details worth preserving and realistic everyday usage context. Do not confuse screenshot review quotes with manufacturer facts. Do not claim to have independently tested the product.',
+  'EVIDENCE: For every item label status as "verified" only if directly visible in supplied photos or explicitly present in operator-confirmed specs; otherwise "uncertain". Include a concise source clue in each statement, e.g. "front close-up" or "provided specs".',
+  'PRIORITY: PRODUCT ACCURACY over marketing language. Distinguish photograph content from claims printed on a page. Treat reviews as subjective accounts, not product facts.',
+  'OUTPUT: English, concise but detailed; ONE JSON object (no markdown) exactly compatible with this schema:',
+  '{"component_count":{"count":<integer or null>,"basis":"<what was counted>","certain":<true|false>},',
+  ' "items":[{"section":"shape|components|color_material|compartments|proportions|mounting|details|labels_text|usage","statement":"<specific short sentence including source clue>","status":"verified|uncertain"}],',
+  ' "localized_summary":"<product summary in DISPLAY_LANGUAGE; no unsupported claims>",',
+  ' "not_visible":["<important unseen geometry or unreadable label>"],',
+  ' "negative_constraints":["<product-specific generation mistake to avoid>"]}',
+  'Provide 4-8 shape/details observations and 2-6 label/control observations when visible. If evidence is thin, return fewer items instead of hallucinating.',
+  'Negative constraints must explicitly prevent hallucinated buttons, fake logos/text, altered lid/handle shapes and wrong colors. Do not put unsupported capabilities into verified items.',
 ].join('\n');
 
 const clean = (v, n = MAX_ITEM) => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
@@ -98,7 +106,7 @@ function createProductAnalysis({ products, router, log = () => {} }) {
     if (!a) return null;
     const intact = imagesIntact(p, a);
     return {
-      v: a.v, status: a.status, text: a.text, sample: !!a.sample, source: a.source, basedOn: a.basedOn || null, edits: a.edits || 0, edited: a.text !== a.originalText,
+      v: a.v, status: a.status, text: a.text, localizedSummary: a.localizedSummary || '', displayLanguage: a.displayLanguage || 'en', sample: !!a.sample, source: a.source, basedOn: a.basedOn || null, edits: a.edits || 0, edited: a.text !== a.originalText,
       productId: p.id, imageSetVersion: a.imageSetVersion, imageIds: a.imageIds, intact,
       ai: a.ai || null, sections: a.sections || null, createdAt: a.createdAt, updatedAt: a.updatedAt, approvedAt: a.approvedAt || null, approvedBy: a.approvedBy || null,
     };
@@ -123,8 +131,19 @@ function createProductAnalysis({ products, router, log = () => {} }) {
     };
   }
 
-  function userPrompt(p, ids) {
-    return [`PRODUCT_NAME: ${p.name || '(unnamed)'}`, `CATEGORY: ${p.category || '(unknown)'}`, `You will receive ${ids.length} reference photo(s) of this product, each preceded by a label. Analyze them together as ONE product.`, 'Return the JSON object described in the system message.'].join('\n');
+  function userPrompt(p, ids, language = 'ko') {
+    const known = (p.specs || []).filter((s) => s.verified).slice(0, 20).map((s) => '- ' + String(s.text || '').slice(0, 300));
+    const review = p.reviewResearch?.approved ? p.reviewResearch.analysis : null;
+    return [
+      `DISPLAY_LANGUAGE: ${['ko', 'en'].includes(language) ? language : 'ko'} (localized_summary only; all image generation prompts stay English)`,
+      'PRODUCT NAME (operator/retailer, not proof of visible label): ' + (p.name || '(unknown)'),
+      'CATEGORY: ' + (p.category || '(unknown)'),
+      'OPERATOR-CONFIRMED SPECS (source: operator; do not label as photo-visible):', ...(known.length ? known : ['none']),
+      'PRODUCT DESCRIPTION (potential marketing claims; verify independently before promotion): ' + (p.description || '(none)').slice(0, 1400),
+      'APPROVED CUSTOMER REVIEW THEMES (subjective research only, not verified product facts): ' + (review ? [review.summary, ...(review.pros || []), ...(review.cons || [])].filter(Boolean).join('; ').slice(0, 900) : '(none)'),
+      'There are ' + ids.length + ' source product screenshots attached. Read their visible geometry, text and control layout before relying on product name or sales copy.',
+      'Output the specified JSON, suitable for a precise image-reference description. If an image contains a collage, identify distinct viewpoints without assuming separate products.',
+    ].join('\n');
   }
   function imageInputs(p, ids) {
     const files = products.imageFiles(p.id, ids);
@@ -140,11 +159,11 @@ function createProductAnalysis({ products, router, log = () => {} }) {
   }
 
   /** Free: what an analysis would use and cost. Nothing is sent. */
-  function estimate(pid, { imageIds } = {}) {
+  function estimate(pid, { imageIds, language = 'ko' } = {}) {
     const p = raw(pid);
     const ids = selectImages(p, imageIds);
     const r = assertVision();
-    const est = router.estimate('productUnderstanding', { inputChars: SYSTEM.length + userPrompt(p, ids).length, outputTokens: 2000, images: ids.length });
+    const est = router.estimate('productUnderstanding', { inputChars: SYSTEM.length + userPrompt(p, ids, language).length, outputTokens: 2000, images: ids.length });
     return Object.assign({}, est, { productId: pid, imageIds: ids, count: 1, imageCount: ids.length, imageSetVersion: peekSetVersion(p, ids), nextImageSetVersion: (p.imageSets || []).length + 1, mock: r.provider === 'mock', note: `제품 이미지 ${ids.length}장 시각 분석 1회. ` + (est.note || '') });
   }
 
@@ -173,16 +192,16 @@ function createProductAnalysis({ products, router, log = () => {} }) {
     lines.push('', 'NEGATIVE CONSTRAINTS (prevent product morphing):');
     negatives.concat(FIXED_NEGATIVES).forEach((x) => lines.push('- ' + x));
     const text = lines.join('\n').slice(0, MAX_TEXT);
-    return { text, sections: { items, componentCount: { count, certain: countCertain, basis: clean(cc.basis) }, notVisible, negatives } };
+    return { text, localizedSummary: clean(json.localized_summary, 1000), sections: { items, componentCount: { count, certain: countCertain, basis: clean(cc.basis) }, notVisible, negatives } };
   }
 
   /** Paid (unless the AI task is routed to the free sample). A NEW version is saved; the approved version is untouched. */
-  async function generate(pid, { imageIds, confirm } = {}) {
+  async function generate(pid, { imageIds, confirm, language = 'ko' } = {}) {
     const p0 = raw(pid);
     const ids = selectImages(p0, imageIds);
     assertVision();
     const images = imageInputs(p0, ids);
-    const out = await router.run('productUnderstanding', { system: SYSTEM, prompt: userPrompt(p0, ids), images, json: true, maxTokens: 2500, confirm, dedupeKey: 'analysis:' + pid });
+    const out = await router.run('productUnderstanding', { system: SYSTEM, prompt: userPrompt(p0, ids, language), images, json: true, maxTokens: 2500, confirm, dedupeKey: 'analysis:' + pid });
     let rec = null;
     await products.mutate(pid, (p) => {
       p.analyses = p.analyses || [];
@@ -193,7 +212,7 @@ function createProductAnalysis({ products, router, log = () => {} }) {
         body = { text: [`PRODUCT STRUCTURE DESCRIPTION — ${p.name || 'product'} (analysis v${v}, reference image set V${set.v})`, SAMPLE_MARK, 'The AI task "제품 이해" is routed to the free sample, so no real image analysis ran. Replace this text with a description you verified yourself, or connect a vision AI in Settings and analyze again.'].join('\n'), sections: null, sample: true };
       } else body = Object.assign(assemble(p, out.json, { v, imageSetVersion: set.v, imageCount: ids.length }), { sample: false });
       p.analyses.forEach((a) => { if (a.status === 'draft') a.status = 'superseded'; }); // older unapproved drafts are history; the approved one is untouched
-      rec = { v, productId: pid, status: 'draft', source: 'ai', basedOn: null, sample: body.sample, text: body.text, originalText: body.text, sections: body.sections, imageSetVersion: set.v, imageSetHash: set.hash, imageIds: ids.slice(), imageHashes: ids.map((id) => { const im = p.images.find((x) => x.id === id); return { id, sha256: im ? im.sha256 : null }; }),
+      rec = { v, productId: pid, status: 'draft', source: 'ai', basedOn: null, sample: body.sample, text: body.text, localizedSummary: body.localizedSummary || '', displayLanguage: language, originalText: body.text, sections: body.sections, imageSetVersion: set.v, imageSetHash: set.hash, imageIds: ids.slice(), imageHashes: ids.map((id) => { const im = p.images.find((x) => x.id === id); return { id, sha256: im ? im.sha256 : null }; }),
         ai: { provider: out.provider, model: out.model, mock: !!out.mock, usage: out.usage || null, at: nowIso() }, edits: 0, createdAt: nowIso(), updatedAt: nowIso() };
       p.analyses.push(rec);
     });
