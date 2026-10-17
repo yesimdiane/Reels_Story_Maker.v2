@@ -47,7 +47,7 @@ const SYSTEM = [
   ' "negative_constraints":["<product-specific generation mistake to avoid>"]}',
   'Provide 4-8 shape/details observations and 2-6 label/control observations when visible. If evidence is thin, return fewer items instead of hallucinating.',
   'Negative constraints must explicitly prevent hallucinated buttons, fake logos/text, altered lid/handle shapes and wrong colors. Do not put unsupported capabilities into verified items.',
-].join('\\n');
+].join('\n');
 
 const clean = (v, n = MAX_ITEM) => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
 
@@ -140,7 +140,7 @@ function createProductAnalysis({ products, router, log = () => {} }) {
       'APPROVED CUSTOMER REVIEW THEMES (subjective research only, not verified product facts): ' + (review ? [review.summary, ...(review.pros || []), ...(review.cons || [])].filter(Boolean).join('; ').slice(0, 900) : '(none)'),
       'There are ' + ids.length + ' source product screenshots attached. Read their visible geometry, text and control layout before relying on product name or sales copy.',
       'Output the specified JSON, suitable for a precise image-reference description. If an image contains a collage, identify distinct viewpoints without assuming separate products.',
-    ].join('\\n');
+    ].join('\n');
   }
   function imageInputs(p, ids) {
     const files = products.imageFiles(p.id, ids);
