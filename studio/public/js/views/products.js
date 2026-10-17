@@ -56,19 +56,50 @@ function list(wrap) {
 }
 
 function newProduct() {
-  const f = { name: '', url: '', affiliateUrl: '', description: '', features: '' };
+  const f = { affiliateUrl: '', productNumber: '', itemNumber: '' };
+  let busy = false;
+  const field = (label, placeholder, key, help = '') => h('div', { class: 'field' },
+    h('label', null, label),
+    h('input', { type: 'text', placeholder, 'aria-label': label, oninput: (e) => (f[key] = e.target.value.trim()) }),
+    help ? h('div', { class: 'small muted' }, help) : null);
   modal((close) => h('div', { class: 'stack' },
-    h('h2', null, '새 제품'),
-    h('p', { class: 'small muted', style: 'margin:0' }, 'URL을 넣으면 공개된 페이지에서 제목·이미지·사양을 가져와 보려고 시도합니다(robots.txt 준수, 차단·로그인 우회 없음). 안 되면 직접 입력으로 이어집니다. 가져온 사양은 "미확인"으로 표시되며 확인해야 사용됩니다.'),
-    inp('제품 URL (쿠팡 등, 선택)', 'url', 'https://…', (v) => (f.url = v)),
-    inp('제품 이름', 'text', '', (v) => (f.name = v)),
-    inp('쿠팡 파트너스(제휴) 링크', 'url', '', (v) => (f.affiliateUrl = v)),
-    h('div', { class: 'field' }, h('label', null, '제품 설명 (선택)'), h('textarea', { rows: 2, oninput: (e) => (f.description = e.target.value) })),
-    h('div', { class: 'field' }, h('label', null, '확인된 기능·특징 (한 줄에 하나, 직접 확인한 것만)'), h('textarea', { rows: 3, oninput: (e) => (f.features = e.target.value) })),
-    h('div', { class: 'row end' }, h('button', { class: 'btn ghost', onclick: close }, '취소'), h('button', { class: 'btn', onclick: async () => {
-      const r = await act(() => api.post('/api/products', { name: f.name, url: f.url, affiliateUrl: f.affiliateUrl, description: f.description, features: f.features.split('\n').map((x) => x.trim()).filter(Boolean) }), { ok: '제품을 만들었습니다' });
-      if (r && r.id) { close(); setProduct(r.id); if (f.url) { try { await api.post(`/api/products/${r.id}/extract`); } catch (e) { toast(e.message, { error: true, recovery: e.recovery }); } } location.hash = '#/products/' + r.id; }
-    } }, '만들기'))));
+    h('h2', null, 'AI 제품 등록'),
+    h('p', { class: 'small muted', style: 'margin:0' }, '쿠팡 제휴 링크와 상품번호로 공개된 상품 페이지의 제품명·설명·이미지·사양을 가져와 봅니다. 차단되거나 수집할 수 없는 항목은 미확인으로 남겨 수동 보완할 수 있습니다.'),
+    field('쿠팡 파트너스 제휴 링크', 'https://link.coupang.com/a/...', 'affiliateUrl', '릴스에 사용할 제휴 링크입니다. 원본 그대로 저장됩니다.'),
+    field('쿠팡 상품번호', '예: 9738720085', 'productNumber', '쿠팡상품번호의 하이픈 앞 숫자를 입력하세요.'),
+    field('옵션 / 판매자번호 (선택)', '예: 29146799836', 'itemNumber', '쿠팡상품번호의 하이픈 뒤 숫자입니다.'),
+    h('p', { class: 'small muted', style: 'margin:0' }, '상품 정보는 자동 수집을 시도한 뒤 확인해야 합니다. 쿠팡 접근 제한을 우회하지 않으며 가격·후기·검증되지 않은 성능은 자동 확정하지 않습니다.'),
+    h('div', { class: 'row end' },
+      h('button', { class: 'btn ghost', onclick: close }, '취소'),
+      h('button', { class: 'btn', onclick: async (e) => {
+        if (busy) return;
+        const affiliateUrl = f.affiliateUrl.trim();
+        const productNumber = f.productNumber.trim();
+        const itemNumber = f.itemNumber.trim();
+        if (!affiliateUrl || !/^https:\/\//i.test(affiliateUrl)) { toast('https://로 시작하는 제휴 링크를 입력하세요.', { error: true }); return; }
+        try {
+          const u = new URL(affiliateUrl);
+          if (!['link.coupang.com', 'www.coupang.com', 'coupang.com'].includes(u.hostname) || u.username || u.password) throw new Error('쿠팡 제휴 링크만 입력할 수 있습니다.');
+        } catch (err) { toast(err.message === 'Invalid URL' ? '올바른 쿠팡 링크를 입력하세요.' : err.message, { error: true }); return; }
+        if (!/^\d{5,20}$/.test(productNumber)) { toast('쿠팡 상품번호를 숫자로 입력하세요.', { error: true }); return; }
+        if (itemNumber && !/^\d{5,20}$/.test(itemNumber)) { toast('옵션/판매자번호는 숫자로 입력하세요.', { error: true }); return; }
+        const url = 'https://www.coupang.com/vp/products/' + productNumber + (itemNumber ? '?itemId=' + itemNumber : '');
+        busy = true;
+        e.currentTarget.disabled = true;
+        let r;
+        try { r = await api.post('/api/products', { name: '', url, affiliateUrl }); }
+        catch (err) { busy = false; e.currentTarget.disabled = false; toast(err.message, { error: true, recovery: err.recovery }); return; }
+        if (!r || !r.id) { busy = false; e.currentTarget.disabled = false; return; }
+        close();
+        setProduct(r.id);
+        location.hash = '#/products/' + r.id;
+        try {
+          const extracted = await api.post('/api/products/' + r.id + '/extract');
+          if (extracted?.extraction?.status === 'ok') toast('상품 정보를 불러왔습니다. 항목을 확인하고 승인해 주세요.');
+          else toast('제품은 등록됐지만 쇼핑몰 정보 수집이 차단되었거나 실패했습니다. 이미지와 사양을 직접 보완해 주세요.');
+        } catch (err) { toast('제품은 등록됐습니다. 자동 수집에 실패해 직접 입력할 수 있습니다.', { error: true, recovery: err.recovery }); }
+        await act(async () => null);
+      } }, '제품 찾아서 등록하기'))));
 }
 const inp = (label, type, ph, on) => h('div', { class: 'field' }, h('label', null, label), h('input', { type, placeholder: ph, oninput: (e) => on(e.target.value) }));
 
@@ -114,6 +145,54 @@ function draw(p) {
     fld('금지 표현 (쉼표로 구분 — 영상/대본에서 쓰면 안 되는 제품 주장)', f.forbidden, (v) => (f.forbidden = v)),
     h('div', { class: 'row end' }, h('button', { class: 'btn', onclick: () => run(() => api.put('/api/products/' + p.id, { code: f.code, price: { text: f.price }, name: f.name, category: f.category, url: f.url, affiliateUrl: f.affiliateUrl, description: f.description, specs: f.specs, forbiddenClaims: f.forbidden.split(',').map((x) => x.trim()).filter(Boolean) }), '저장했습니다') }, '저장')),
     p.url ? h('p', { class: 'small muted', style: 'margin:0' }, '출처 URL: ' + p.url + ' · 가격·할인·평점은 수집하지 않으며 제품 사실은 직접 확인한 것만 사용합니다.') : null));
+
+  // ---- Customer-review research (separate from product reference images) ----
+  const rr = p.reviewResearch || { images: [], text: '', analysis: null, approved: false };
+  const reviewText = h('textarea', { rows: 5, placeholder: '리뷰 원문을 붙여 넣어도 됩니다. 리뷰별로 구분해 주세요.', 'aria-label': '리뷰 원문' }, rr.text || '');
+  const reviewFile = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp', multiple: true, 'aria-label': '리뷰 스크린샷', onchange: async (e) => {
+    const files = Array.from(e.target.files || []); e.target.value = '';
+    if (files.length + (rr.images || []).length > 3) return toast('리뷰 스크린샷은 최대 3장입니다.', { error: true });
+    for (const file of files) {
+      try { await api.upload('/api/products/' + p.id + '/reviews/image', file); }
+      catch (err) { toast(err.message, { error: true, recovery: err.recovery }); return; }
+    }
+    toast('리뷰 캡처를 추가했습니다.'); await act(async () => null);
+  } });
+  const saveReviewText = async () => {
+    try { await api.put('/api/products/' + p.id + '/reviews', { text: reviewText.value }); toast('리뷰 원문을 저장했습니다.'); await act(async () => null); }
+    catch (err) { toast(err.message, { error: true }); }
+  };
+  const reviewRun = async () => {
+    if (reviewText.value !== (rr.text || '')) {
+      toast('변경된 리뷰 원문을 먼저 저장해 주세요.', { error: true }); return;
+    }
+    let estimate;
+    try { estimate = await api.post('/api/products/' + p.id + '/reviews/estimate'); }
+    catch (err) { toast(err.message, { error: true }); return; }
+    const confirm = await confirmPaid({ est: estimate, title: '리뷰 3개 AI 분석', body: h('p', { class: 'small' }, '리뷰 캡처와 원문을 AI 모델에 전송해 장점·단점·구매 동기·코미디 상황을 분석합니다.') });
+    if (!confirm) return;
+    try { await api.post('/api/products/' + p.id + '/reviews/analyze', { confirm }); toast('리뷰 분석 초안이 생성됐습니다. 내용을 확인하고 승인해 주세요.'); await act(async () => null); }
+    catch (err) { toast(err.message, { error: true, recovery: err.recovery }); }
+  };
+  wrap.append(h('div', { class: 'card stack', style: 'gap:12px', 'data-product-reviews': p.id },
+    h('div', { class: 'card-head' }, h('h2', null, '리뷰 리서치 · 최대 3개'), chip(rr.approved ? '분석 승인' : '미승인', rr.approved ? 'done' : 'attention')),
+    h('p', { class: 'small muted' }, '리뷰는 소비자 개인 경험입니다. 확인된 제품 사양이 아니므로 광고 문구에 사실처럼 사용하지 않습니다. 리뷰 캡처는 제품 레퍼런스 사진과 분리됩니다.'),
+    h('div', { class: 'field' }, h('label', null, '리뷰 스크린샷 (최대 3장)'), reviewFile),
+    h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' }, ...(rr.images || []).map((im, i) =>
+      h('figure', { style: 'margin:0;width:110px' }, h('img', { src: '/media/product-review/' + p.id + '/' + i, alt: '리뷰 캡처 ' + (i + 1), style: 'width:100%;height:110px;object-fit:contain' }), h('figcaption', { class: 'small muted' }, '리뷰 ' + (i + 1))))),
+    h('div', { class: 'field' }, h('label', null, '리뷰 원문 (선택)'), reviewText),
+    h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' },
+      h('button', { class: 'btn ghost', onclick: saveReviewText }, '리뷰 원문 저장'),
+      h('button', { class: 'btn clay', disabled: !(rr.images || []).length && !(rr.text || '').trim(), onclick: reviewRun }, 'AI 리뷰 분석')),
+    rr.analysis ? h('div', { class: 'stack', style: 'gap:8px' },
+      h('h3', null, 'AI 분석 초안'),
+      h('p', null, rr.analysis.summary || ''),
+      ...[['pros','장점'],['cons','단점'],['purchaseMotivations','구매 동기'],['comicSituations','릴스 코미디 아이디어'],['cautions','주의사항']].map(([key,label]) =>
+        h('div', { class: 'stack', style: 'gap:3px' }, h('b', null, label), h('p', { class: 'small', style: 'white-space:pre-wrap;margin:0' }, (rr.analysis[key] || []).map((x) => '• ' + x).join('\n') || '없음'))),
+      h('button', { class: 'btn sage', disabled: !!rr.approved, onclick: async () => {
+        try { await api.post('/api/products/' + p.id + '/reviews/approve', { approved: true }); toast('리뷰 분석이 승인되었습니다.'); await act(async () => null); }
+        catch (err) { toast(err.message, { error: true }); }
+      } }, rr.approved ? '승인됨' : '내용 확인 후 승인')) : null));
 
   // ---- B. images ----
   const dz = imageIntake({ product: p, run, rerender: () => act(async () => null) });
