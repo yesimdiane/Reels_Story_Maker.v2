@@ -223,9 +223,18 @@ function draw(p) {
           im.kind === 'ai_generated' ? h('button', { class: 'btn sm ghost', onclick: () => compare(p, im) }, '원본과 비교') : null),
         im.status === 'replaced' ? null : savedControls(p, im, imgs.filter((i) => i.kind !== 'ai_generated' && i.status !== 'replaced'), run)));
   };
+  const waitingUploaded = imgs.filter((i) => i.kind === 'uploaded' && i.status === 'pending' && !i.removed);
+  const approveUploadedButton = h('button', { class: 'btn sm sage', type: 'button', disabled: !waitingUploaded.length, 'data-approve-uploaded-all': '',
+    onclick: async () => {
+      const ids = waitingUploaded.map((i) => i.id);
+      if (!ids.length) return;
+      const yes = await confirmDialog({ title: '제품 참조 이미지 전체 승인', body: '직접 업로드한 제품 이미지 ' + ids.length + '장을 모두 승인할까요? 리뷰와 AI 생성 이미지는 포함되지 않습니다.', confirm: '전체 승인' });
+      if (!yes) return;
+      await run(() => api.post('/api/products/' + p.id + '/images/approve-uploaded', { imageIds: ids }), ids.length + '장의 제품 참조 이미지를 승인했습니다.');
+    } }, '업로드 이미지 전체 승인 (' + waitingUploaded.length + ')');
   const approvedOrig = imgs.filter((i) => i.kind !== 'ai_generated' && i.status === 'approved');
   wrap.append(h('div', { class: 'card stack', style: 'gap:14px' },
-    h('div', { class: 'card-head' }, h('h2', null, 'B · 참조 이미지'), h('div', { class: 'row' },)),
+    h('div', { class: 'card-head' }, h('h2', null, 'B · 참조 이미지'), h('div', { class: 'row' }, chip('승인 ' + imgs.filter((i) => i.kind === 'uploaded' && i.status === 'approved').length + '/' + imgs.filter((i) => i.kind === 'uploaded' && !i.removed && i.status !== 'replaced').length), approveUploadedButton)),
     h('div', { class: 'banner' }, icon('lock'), h('div', null, '쇼핑몰에서 가져온 이미지는 광고·AI 변형 사용 권한이 확인되지 않았습니다. AI 생성 이미지는 항상 "AI 생성"으로 표시되며 제조사 사진으로 쓰이지 않습니다. 제품의 모양·로고·색상·기능을 바꾼 이미지는 승인하지 마세요.')),
     imgs.filter((i) => i.kind !== 'ai_generated').length ? h('div', { class: 'ref-grid', style: 'grid-template-columns:repeat(auto-fill,minmax(170px,1fr))' }, imgs.filter((i) => i.kind !== 'ai_generated').map(card)) : h('div', { class: 'empty' }, '이미지가 없습니다. 업로드하거나 URL에서 가져오세요.'),
     dz));
