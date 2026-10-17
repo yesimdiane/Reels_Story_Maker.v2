@@ -19,8 +19,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
+
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
       - name: Fast core regression tests
         run: npm run test:quick
+
 
   full:
     if: github.event_name != 'pull_request'
