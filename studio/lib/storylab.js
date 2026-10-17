@@ -185,6 +185,18 @@ function createStoryLab({ store, products, prompts, router, universes: getUniver
     return Object.assign({ cast: q.cast, castWarnings: q.castWarnings }, router.estimate('storyConcepts', { inputChars: q.prompt.length, outputTokens: 1500 * r.count, images: q.images.length, override: override || q.composed.providerOverride }), { category: r.category, count: r.count, plan: r.plan, maxDurationSec: r.maxDurationSec, summary: cats.planText(r.plan) });
   }
 
+  /** Free preview: exact composed storyline prompt and selected input references. */
+  function preview(pid, req = {}) {
+    const r = cats.resolveRequest(req);
+    const q = build(pid, { count: r.count, extra: req.extra || '', plan: r.plan, maxSec: r.maxDurationSec, cast: req.cast });
+    return {
+      inputs: { productId: pid, productName: q.product.name, category: r.category, count: r.count, plan: r.plan, maxDurationSec: r.maxDurationSec, extra: req.extra || '', verifiedFacts: q.binding.facts, forbiddenClaims: q.product.forbiddenClaims || [], referenceImageIds: q.refs, characterReferenceIds: q.charRefs, cast: q.cast, imageAttachmentCount: q.images.length },
+      prompt: q.prompt, promptVersions: q.composed.versions,
+      expectedOutput: { concepts: [{ category: 'drama | viral | info', title: 'English title', storyline: 'English storyline (3-8 flowing sentences)', title_ko: '한국어 제목', storyline_ko: '한국어 스토리라인', estimatedDurationSec: r.maxDurationSec }] },
+      note: '미리보기는 무료이며 모델을 호출하지 않습니다. 생성 시에는 이 입력으로 새 스토리라인을 만듭니다.'
+    };
+  }
+
   const KO_FIELDS = ['title', 'storyline'];
   function validateBatch(raw, q, plan, maxSec = cats.MAX_SEC) {
     const list = Array.isArray(raw && raw.concepts) ? raw.concepts : [];
@@ -415,7 +427,7 @@ function createStoryLab({ store, products, prompts, router, universes: getUniver
   }
   const peek = (pid, cid) => { const c = read(pid).concepts.find((x) => x.id === cid); return c ? view(c) : null; };
 
-  return { list, castState, saveCast, allCasts, generate, regenerate, edit, approve, revoke, reject, reopen, hold, resume, remove, restore, estimate, plan, storylineOf, requireApproved, peek, isApproved, FIELDS, FIELD_LABEL, similarity };
+  return { list, castState, saveCast, allCasts, generate, regenerate, edit, approve, revoke, reject, reopen, hold, resume, remove, restore, estimate, preview, plan, storylineOf, requireApproved, peek, isApproved, FIELDS, FIELD_LABEL, similarity };
 }
 
 module.exports = { createStoryLab, FIELDS, NEW_FIELDS, STORY_RULES, similarity };

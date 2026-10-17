@@ -100,10 +100,20 @@ function body(lab, prod) {
     if (!Number.isInteger(sec) || sec < 10 || sec > 90) return toast('영상 최대 길이는 10~90초의 정수로 입력하세요', { error: true });
     if (lab.cast.errors && lab.cast.errors.length) return toast(lab.cast.errors[0].message, { error: true });
     const req = { category: view.category, count: effCount(), maxDurationSec: sec, extra: view.extra, cast: lab.cast.cast };
-    let est;
-    try { est = await api.post(`/api/storylab/${pid}/estimate`, req); } catch (e) { return toast(e.message, { error: true, recovery: e.recovery }); }
+    let est, preview;
+    try { [est, preview] = await Promise.all([api.post(`/api/storylab/${pid}/estimate`, req), api.post(`/api/storylab/${pid}/preview`, req)]); } catch (e) { return toast(e.message, { error: true, recovery: e.recovery }); }
     const c = await confirmPaid({ title: `스토리 ${est.count}개 생성`, est, confirmLabel: '생성', body: h('div', { class: 'stack', style: 'gap:8px' },
       h('div', { class: 'card flat stack', style: 'gap:4px', 'data-confirm-summary': '' }, h('div', { class: 'small muted' }, '만들 내용'), h('b', null, est.summary), h('div', { class: 'small' }, `총 ${est.count}개 · 최대 ${est.maxDurationSec}초 · 영어 스토리라인과 한국어 번역을 한 번에 생성`), view.extra ? h('div', { class: 'small muted' }, '추가 지시: ' + view.extra) : null),
+      h('details', { 'data-story-prompt-preview': '' },
+        h('summary', null, 'AI 입력값 · 최종 프롬프트 · 결과 형식 보기'),
+        h('div', { class: 'stack', style: 'gap:8px;margin-top:8px' },
+          h('b', null, 'AI 입력값'),
+          h('pre', { style: 'white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto' }, JSON.stringify(preview.inputs, null, 2)),
+          h('b', null, '실제 전송할 프롬프트'),
+          h('pre', { style: 'white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto' }, preview.prompt),
+          h('b', null, 'AI에 요청하는 결과 형식 (생성 전 예시)'),
+          h('pre', { style: 'white-space:pre-wrap;overflow-wrap:anywhere' }, JSON.stringify(preview.expectedOutput, null, 2)),
+          h('p', { class: 'small muted' }, '실제 생성 결과는 생성 후 아래 스토리 카드에 표시됩니다. 첨부 이미지는 파일 내용 대신 참조 ID와 개수만 표시합니다.'))),
       h('p', { class: 'small muted', style: 'margin:0' }, '장면·대사·이미지 프롬프트는 만들지 않습니다. 기존 스토리와 승인된 버전은 바뀌지 않고 새 스토리만 추가됩니다.')) });
     if (c === null) return;
     await act(async () => { await api.post(`/api/storylab/${pid}/generate`, Object.assign({}, req, { confirm: c })); return null; }, { ok: '스토리를 만들었습니다' });
