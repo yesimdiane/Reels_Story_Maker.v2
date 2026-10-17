@@ -193,7 +193,7 @@ function createProductService({ store, router, extractFn = extractProduct, downl
           p.code = next;
         }
       }
-      ['name', 'category', 'description', 'url', 'affiliateUrl'].forEach((k) => patch[k] !== undefined && (p[k] = String(patch[k]).trim().slice(0, k === 'description' ? 3000 : 300)));
+      ['name', 'category', 'description', 'url', 'affiliateUrl', 'referencePrompt'].forEach((k) => patch[k] !== undefined && (p[k] = String(patch[k]).trim().slice(0, ['description','referencePrompt'].includes(k) ? 3000 : 300)));
       if (patch.url) require('./extract').parseUrl(patch.url);
       if (patch.price !== undefined) p.price = cleanPrice(patch.price);
       if (Array.isArray(patch.forbiddenClaims)) p.forbiddenClaims = patch.forbiddenClaims.map(String).filter(Boolean);
