@@ -146,6 +146,54 @@ function draw(p) {
     h('div', { class: 'row end' }, h('button', { class: 'btn', onclick: () => run(() => api.put('/api/products/' + p.id, { code: f.code, price: { text: f.price }, name: f.name, category: f.category, url: f.url, affiliateUrl: f.affiliateUrl, description: f.description, specs: f.specs, forbiddenClaims: f.forbidden.split(',').map((x) => x.trim()).filter(Boolean) }), '저장했습니다') }, '저장')),
     p.url ? h('p', { class: 'small muted', style: 'margin:0' }, '출처 URL: ' + p.url + ' · 가격·할인·평점은 수집하지 않으며 제품 사실은 직접 확인한 것만 사용합니다.') : null));
 
+  // ---- Customer-review research (separate from product reference images) ----
+  const rr = p.reviewResearch || { images: [], text: '', analysis: null, approved: false };
+  const reviewText = h('textarea', { rows: 5, placeholder: '리뷰 원문을 붙여 넣어도 됩니다. 리뷰별로 구분해 주세요.', 'aria-label': '리뷰 원문' }, rr.text || '');
+  const reviewFile = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp', multiple: true, 'aria-label': '리뷰 스크린샷', onchange: async (e) => {
+    const files = Array.from(e.target.files || []); e.target.value = '';
+    if (files.length + (rr.images || []).length > 3) return toast('리뷰 스크린샷은 최대 3장입니다.', { error: true });
+    for (const file of files) {
+      try { await api.upload('/api/products/' + p.id + '/reviews/image', file); }
+      catch (err) { toast(err.message, { error: true, recovery: err.recovery }); return; }
+    }
+    toast('리뷰 캡처를 추가했습니다.'); await act(async () => null);
+  } });
+  const saveReviewText = async () => {
+    try { await api.put('/api/products/' + p.id + '/reviews', { text: reviewText.value }); toast('리뷰 원문을 저장했습니다.'); await act(async () => null); }
+    catch (err) { toast(err.message, { error: true }); }
+  };
+  const reviewRun = async () => {
+    if (reviewText.value !== (rr.text || '')) {
+      toast('변경된 리뷰 원문을 먼저 저장해 주세요.', { error: true }); return;
+    }
+    let estimate;
+    try { estimate = await api.post('/api/products/' + p.id + '/reviews/estimate'); }
+    catch (err) { toast(err.message, { error: true }); return; }
+    const confirm = await confirmPaid({ estimate, title: '리뷰 3개 AI 분석', description: '리뷰 캡처와 원문을 AI 모델에 전송해 장점·단점·구매 동기·코미디 상황을 분석합니다. 유료 모델이면 비용이 발생합니다.' });
+    if (!confirm) return;
+    try { await api.post('/api/products/' + p.id + '/reviews/analyze', { confirm }); toast('리뷰 분석 초안이 생성됐습니다. 내용을 확인하고 승인해 주세요.'); await act(async () => null); }
+    catch (err) { toast(err.message, { error: true, recovery: err.recovery }); }
+  };
+  wrap.append(h('div', { class: 'card stack', style: 'gap:12px', 'data-product-reviews': p.id },
+    h('div', { class: 'card-head' }, h('h2', null, '리뷰 리서치 · 최대 3개'), chip(rr.approved ? '분석 승인' : '미승인', rr.approved ? 'done' : 'attention')),
+    h('p', { class: 'small muted' }, '리뷰는 소비자 개인 경험입니다. 확인된 제품 사양이 아니므로 광고 문구에 사실처럼 사용하지 않습니다. 리뷰 캡처는 제품 레퍼런스 사진과 분리됩니다.'),
+    h('div', { class: 'field' }, h('label', null, '리뷰 스크린샷 (최대 3장)'), reviewFile),
+    h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' }, ...(rr.images || []).map((im, i) =>
+      h('figure', { style: 'margin:0;width:110px' }, h('img', { src: '/media/product-review/' + p.id + '/' + i, alt: '리뷰 캡처 ' + (i + 1), style: 'width:100%;height:110px;object-fit:contain' }), h('figcaption', { class: 'small muted' }, '리뷰 ' + (i + 1))))),
+    h('div', { class: 'field' }, h('label', null, '리뷰 원문 (선택)'), reviewText),
+    h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' },
+      h('button', { class: 'btn ghost', onclick: saveReviewText }, '리뷰 원문 저장'),
+      h('button', { class: 'btn clay', disabled: !(rr.images || []).length && !(rr.text || '').trim(), onclick: reviewRun }, 'AI 리뷰 분석')),
+    rr.analysis ? h('div', { class: 'stack', style: 'gap:8px' },
+      h('h3', null, 'AI 분석 초안'),
+      h('p', null, rr.analysis.summary || ''),
+      ...[['pros','장점'],['cons','단점'],['purchaseMotivations','구매 동기'],['comicSituations','릴스 코미디 아이디어'],['cautions','주의사항']].map(([key,label]) =>
+        h('div', { class: 'stack', style: 'gap:3px' }, h('b', null, label), h('p', { class: 'small', style: 'white-space:pre-wrap;margin:0' }, (rr.analysis[key] || []).map((x) => '• ' + x).join('\n') || '없음'))),
+      h('button', { class: 'btn sage', disabled: !!rr.approved, onclick: async () => {
+        try { await api.post('/api/products/' + p.id + '/reviews/approve', { approved: true }); toast('리뷰 분석이 승인되었습니다.'); await act(async () => null); }
+        catch (err) { toast(err.message, { error: true }); }
+      } }, rr.approved ? '승인됨' : '내용 확인 후 승인')) : null));
+
   // ---- B. images ----
   const dz = imageIntake({ product: p, run, rerender: () => act(async () => null) });
   const imgs = p.images;
