@@ -151,7 +151,7 @@ function draw(p) {
   const reviewText = h('textarea', { rows: 5, placeholder: '리뷰 원문을 붙여 넣어도 됩니다. 리뷰별로 구분해 주세요.', 'aria-label': '리뷰 원문' }, rr.text || '');
   const reviewFile = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp', multiple: true, 'aria-label': '리뷰 스크린샷', onchange: async (e) => {
     const files = Array.from(e.target.files || []); e.target.value = '';
-    if (files.length + (rr.images || []).length > 3) return toast('리뷰 스크린샷은 최대 3장입니다.', { error: true });
+    if (files.length + (rr.images || []).length + p.images.filter((im) => im.kind === 'uploaded' && !im.removed && im.status !== 'replaced').length > 10) return toast('제품과 리뷰 스크린샷은 합쳐 최대 10장입니다.', { error: true });
     for (const file of files) {
       try { await api.upload('/api/products/' + p.id + '/reviews/image', file); }
       catch (err) { toast(err.message, { error: true, recovery: err.recovery }); return; }
@@ -175,9 +175,9 @@ function draw(p) {
     catch (err) { toast(err.message, { error: true, recovery: err.recovery }); }
   };
   const reviewBlock = h('div', { class: 'stack', style: 'gap:12px', 'data-product-reviews': p.id },
-    h('div', { class: 'card-head' }, h('h2', null, '리뷰 리서치 · 최대 3개'), chip(rr.approved ? '분석 승인' : '미승인', rr.approved ? 'done' : 'attention')),
+    h('div', { class: 'card-head' }, h('h2', null, '리뷰 리서치 · 총 업로드 10장 이내'), chip(rr.approved ? '분석 승인' : '미승인', rr.approved ? 'done' : 'attention')),
     h('p', { class: 'small muted' }, '리뷰는 소비자 개인 경험입니다. 확인된 제품 사양이 아니므로 광고 문구에 사실처럼 사용하지 않습니다. 리뷰 캡처는 제품 레퍼런스 사진과 분리됩니다.'),
-    h('div', { class: 'field' }, h('label', null, '리뷰 스크린샷 (최대 3장)'), reviewFile),
+    h('div', { class: 'field' }, h('label', null, '리뷰 스크린샷 (제품 포함 총 10장)'), reviewFile),
     h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' }, ...(rr.images || []).map((im, i) =>
       h('figure', { style: 'margin:0;width:110px' }, h('img', { src: '/media/product-review/' + p.id + '/' + i, alt: '리뷰 캡처 ' + (i + 1), style: 'width:100%;height:110px;object-fit:contain' }), h('figcaption', { class: 'small muted' }, '리뷰 ' + (i + 1))))),
     h('div', { class: 'field' }, h('label', null, '리뷰 원문 (선택)'), reviewText),
@@ -331,7 +331,7 @@ function draw(p) {
       h('h2', null, 'AI 제품 분석'),
       h('p', { class: 'small muted' }, '제품 사진의 형태·기능·표기 문구는 시각 분석으로, 리뷰의 장단점은 별도의 리뷰 분석으로 정리합니다. AI 실행 전 각각 예상 비용을 확인합니다.'),
       analysisPanel(p)),
-    reviewResults,
+    rr.analysis ? h('div', { class: 'small muted' }, rr.approved ? '리뷰 분석 승인됨 · 스토리 랩에 반영됩니다.' : '리뷰 분석 초안 · 먼저 승인해 주세요.') : null,
     promptSection);
   const intake = h('section', { class: 'card stack', style: 'gap:20px', 'data-unified-product-intake': '' },
     h('div', { class: 'stack', style: 'gap:6px' }, h('h2', null, '1 · 제품 자료 모으기'), h('p', { class: 'small muted' }, '쿠팡 제휴 링크·상품번호로 등록한 제품에 스크린샷과 리뷰를 한 화면에서 추가하세요.')),
