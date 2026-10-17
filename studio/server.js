@@ -173,6 +173,7 @@ function createApp(studio, { token = '', port = 0, host = '127.0.0.1', log = () 
   route('DELETE', '/api/characters/:id', async ({ p }) => S.universes.deleteCharacter(p.id));
   route('GET', '/api/storylab/:pid/cast', async ({ p }) => S.storylab.castState(p.pid));
   route('PUT', '/api/storylab/:pid/cast', async ({ p, body }) => S.storylab.saveCast(p.pid, body));
+  route('POST', '/api/storylab/:pid/preview', async ({ p, body }) => S.storylab.preview(p.pid, body));
   route('POST', '/api/storylab/:pid/estimate', async ({ p, body }) => S.storylab.estimate(p.pid, { category: body.category, cast: body.cast, count: body.count, maxDurationSec: body.maxDurationSec, extra: body.extra }));
   route('POST', '/api/storylab/:pid/generate', async ({ p, body }) => S.storylab.generate(p.pid, { category: body.category, cast: body.cast, count: body.count, maxDurationSec: body.maxDurationSec, extra: body.extra, confirm: body.confirm }));
   route('POST', '/api/storylab/:pid/concepts/:cid/regenerate', async ({ p, body }) => S.storylab.regenerate(p.pid, p.cid, { feedback: body.feedback, confirm: body.confirm }));
