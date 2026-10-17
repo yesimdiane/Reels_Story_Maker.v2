@@ -18,6 +18,7 @@
     "render:fetch-clips": "node renderer/cli.js fetch-clips",
     "gemini:check": "node scripts/check-gemini.js",
     "studio": "node studio/server.js",
+    "studio:keys": "node scripts/check-local-keys.js",
     "start": "node studio/server.js",
     "deploy:check": "node scripts/deploy-check.js",
     "backup": "node scripts/backup-data.js",

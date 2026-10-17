@@ -15,7 +15,13 @@ function loadDotEnv(file) {
 }
 
 function loadConfig(env = process.env, { dotenvFile = path.join(__dirname, '..', '.env'), platform = process.platform } = {}) {
-  const e = Object.assign({}, loadDotEnv(dotenvFile), env);
+  // Local terminal workflow: RF_ENV_FILE=/absolute/path/to/keys.env npm run studio
+  // Explicit env values take precedence; the file is read only by the Node process.
+  const selectedFile = env.RF_ENV_FILE ? path.resolve(env.RF_ENV_FILE) : dotenvFile;
+  if (env.RF_ENV_FILE && !fs.existsSync(selectedFile)) {
+    throw new Error('RF_ENV_FILE does not exist: ' + selectedFile);
+  }
+  const e = Object.assign({}, loadDotEnv(selectedFile), env);
   const num = (k, d) => (e[k] != null && e[k] !== '' ? Number(e[k]) : d);
   const stateDir = e.RF_STATE_DIR || path.join(os.homedir(), '.reels-factory');
   const inCloud = !!(e.K_SERVICE || e.CLOUD_RUN_JOB);
