@@ -1,0 +1,71 @@
+{
+  "comment": "Lip-sync model registry. Endpoint names and the video/audio request fields come from the official muapi-cli 0.2.7 (muapi/commands/edit.py, `muapi edit lipsync`), read statically on 2026-10-15. They are NOT live-tested here: every entry is 'unverified' until the operator confirms it in the MuAPI playground or a real job completes. The registry does not say how many speakers a model can handle, its maximum duration, or its price, so multi-person lip sync is NOT assumed (speakers: 'unknown' is treated as one speaker) and the price must be entered by the operator.",
+  "models": [
+    {
+      "id": "lipsync-sync",
+      "label": "sync · lipsync (video + audio)",
+      "endpoint": "sync-lipsync",
+      "videoField": "video_url",
+      "audioField": "audio_url",
+      "speakers": "unknown",
+      "provider": "muapi",
+      "mode": "video-to-video",
+      "verification": "unverified"
+    },
+    {
+      "id": "lipsync-latentsync",
+      "label": "LatentSync · lipsync (video + audio)",
+      "endpoint": "latentsync-video",
+      "videoField": "video_url",
+      "audioField": "audio_url",
+      "speakers": "unknown",
+      "provider": "muapi",
+      "mode": "video-to-video",
+      "verification": "unverified"
+    },
+    {
+      "id": "lipsync-creatify",
+      "label": "Creatify · lipsync (video + audio)",
+      "endpoint": "creatify-lipsync",
+      "videoField": "video_url",
+      "audioField": "audio_url",
+      "speakers": "unknown",
+      "provider": "muapi",
+      "mode": "video-to-video",
+      "verification": "unverified"
+    },
+    {
+      "id": "lipsync-veed",
+      "label": "VEED · lipsync (video + audio)",
+      "endpoint": "veed-lipsync",
+      "videoField": "video_url",
+      "audioField": "audio_url",
+      "speakers": "unknown",
+      "provider": "muapi",
+      "mode": "video-to-video",
+      "verification": "unverified"
+    },
+    {
+      "id": "lipsync-ltx-2",
+      "label": "LTX-2 19B · lipsync (video + audio)",
+      "endpoint": "ltx-2-19b-lipsync",
+      "videoField": "video_url",
+      "audioField": "audio_url",
+      "speakers": "unknown",
+      "provider": "muapi",
+      "mode": "video-to-video",
+      "verification": "unverified"
+    },
+    {
+      "id": "lipsync-ltx-2.3",
+      "label": "LTX-2.3 · lipsync (video + audio)",
+      "endpoint": "ltx-2.3-lipsync",
+      "videoField": "video_url",
+      "audioField": "audio_url",
+      "speakers": "unknown",
+      "provider": "muapi",
+      "mode": "video-to-video",
+      "verification": "unverified"
+    }
+  ]
+}

@@ -1,0 +1,497 @@
+{
+  "source": "muapi-cli 0.2.7 (official CLI, PyPI/npm 'muapi-cli'), muapi/commands/video.py I2V_MODELS + LIST_INPUT_I2V; read statically on 2026-10-14. NOT a live test: durations, aspect ratios, resolutions and prices are not in this list and must be entered from the MuAPI playground.",
+  "models": [
+    {
+      "alias": "veo3",
+      "endpoint": "veo3-image-to-video",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "veo3-fast",
+      "endpoint": "veo3-fast-image-to-video",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "veo3.1",
+      "endpoint": "veo3.1-image-to-video",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "veo3.1-fast",
+      "endpoint": "veo3.1-fast-image-to-video",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "veo3.1-ref",
+      "endpoint": "veo3.1-reference-to-video",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "veo3.1-lite",
+      "endpoint": "veo3.1-lite-image-to-video",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "veo4",
+      "endpoint": "veo-4-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "kling-std",
+      "endpoint": "kling-v2.1-standard-i2v",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "kling-pro",
+      "endpoint": "kling-v2.1-pro-i2v",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "kling-master",
+      "endpoint": "kling-v2.1-master-i2v",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "kling-v2.5-pro",
+      "endpoint": "kling-v2.5-turbo-pro-i2v",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "kling-v2.5-std",
+      "endpoint": "kling-v2.5-turbo-std-i2v",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "kling-v2.6-pro",
+      "endpoint": "kling-v2.6-pro-i2v",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "kling-v3-pro",
+      "endpoint": "kling-v3.0-pro-image-to-video",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "kling-v3-std",
+      "endpoint": "kling-v3.0-standard-image-to-video",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "kling-v3-4k",
+      "endpoint": "kling-v3.0-4k-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "kling-v3-omni",
+      "endpoint": "kling-v3.0-omni-pro-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "kling-v3-omni-std",
+      "endpoint": "kling-v3.0-omni-standard-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "kling-v3-omni-4k",
+      "endpoint": "kling-v3.0-omni-4k-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "kling-o1",
+      "endpoint": "kling-o1-image-to-video",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "kling-o1-std",
+      "endpoint": "kling-o1-standard-image-to-video",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "kling-o1-ref",
+      "endpoint": "kling-o1-reference-to-video",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "wan2.1",
+      "endpoint": "wan2.1-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "wan2.1-ref",
+      "endpoint": "wan2.1-reference-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "wan2.2",
+      "endpoint": "wan2.2-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "wan2.2-spicy",
+      "endpoint": "wan2.2-spicy-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "wan2.5",
+      "endpoint": "wan2.5-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "wan2.5-fast",
+      "endpoint": "wan2.5-image-to-video-fast",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "wan2.6",
+      "endpoint": "wan2.6-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "wan2.7",
+      "endpoint": "wan2.7-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "wan2.7-ref",
+      "endpoint": "wan2.7-reference-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "seedance-pro",
+      "endpoint": "seedance-pro-i2v",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "seedance-pro-fast",
+      "endpoint": "seedance-pro-i2v-fast",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "seedance-lite",
+      "endpoint": "seedance-lite-i2v",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "seedance-lite-ref",
+      "endpoint": "seedance-lite-reference-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "seedance-v1.5",
+      "endpoint": "seedance-v1.5-pro-i2v",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "seedance-v1.5-fast",
+      "endpoint": "seedance-v1.5-pro-i2v-fast",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "seedance-v2",
+      "endpoint": "seedance-v2.0-i2v",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "seedance-v2-omni",
+      "endpoint": "seedance-2.0-omni-reference",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "seedance-2",
+      "endpoint": "seedance-2-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "seedance-2-fast",
+      "endpoint": "seedance-2-image-to-video-fast",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "seedance-2-flf",
+      "endpoint": "seedance-2-first-last-frame",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "seedance-2-omni",
+      "endpoint": "seedance-2.0-omni-reference",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "seedance-2-vip",
+      "endpoint": "seedance-2-vip-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "hunyuan",
+      "endpoint": "hunyuan-image-to-video",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "runway",
+      "endpoint": "runway-image-to-video",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "runway-act-two",
+      "endpoint": "runway-act-two-i2v",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "pixverse-v4.5",
+      "endpoint": "pixverse-v4.5-i2v",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "pixverse-v5",
+      "endpoint": "pixverse-v5-i2v",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "pixverse-v5.5",
+      "endpoint": "pixverse-v5.5-i2v",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "pixverse-v6",
+      "endpoint": "pixverse-v6-i2v",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "pixverse-v6-trans",
+      "endpoint": "pixverse-v6-transition",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "vidu",
+      "endpoint": "vidu-v2.0-i2v",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "vidu-q1-ref",
+      "endpoint": "vidu-q1-reference",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "vidu-q2-pro",
+      "endpoint": "vidu-q2-pro-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "vidu-q2-turbo",
+      "endpoint": "vidu-q2-turbo-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "vidu-q2-ref",
+      "endpoint": "vidu-q2-reference",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "vidu-q2-start-end",
+      "endpoint": "vidu-q2-pro-start-end-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "vidu-q3-pro",
+      "endpoint": "vidu-q3-pro-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "vidu-q3-turbo",
+      "endpoint": "vidu-q3-turbo-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "vidu-q3-flf",
+      "endpoint": "vidu-q3-pro-first-last-frames",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "midjourney",
+      "endpoint": "midjourney-v7-image-to-video",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "minimax-std",
+      "endpoint": "minimax-hailuo-02-standard-i2v",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "minimax-pro",
+      "endpoint": "minimax-hailuo-02-pro-i2v",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "minimax-2.3-pro",
+      "endpoint": "minimax-hailuo-2.3-pro-i2v",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "minimax-2.3-std",
+      "endpoint": "minimax-hailuo-2.3-standard-i2v",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "minimax-2.3-fast",
+      "endpoint": "minimax-hailuo-2.3-fast",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "ltx-2",
+      "endpoint": "ltx-2-pro-image-to-video",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "ltx-2-fast",
+      "endpoint": "ltx-2-fast-image-to-video",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "ltx-2-19b",
+      "endpoint": "ltx-2-19b-image-to-video",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "ltx-2.3",
+      "endpoint": "ltx-2.3-image-to-video",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "sora-2",
+      "endpoint": "openai-sora-2-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "sora-2-pro",
+      "endpoint": "openai-sora-2-pro-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "sora-2-standard",
+      "endpoint": "openai-sora-2-standard-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "ovi",
+      "endpoint": "ovi-image-to-video",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "grok",
+      "endpoint": "grok-imagine-image-to-video",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "leonardo",
+      "endpoint": "leonardoai-motion-2.0",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "happy-horse",
+      "endpoint": "happy-horse-1-image-to-video-1080p",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "happy-horse-ref",
+      "endpoint": "happy-horse-1-reference-to-video-1080p",
+      "imageField": "images_list",
+      "imageAsList": true
+    },
+    {
+      "alias": "infinitetalk",
+      "endpoint": "infinitetalk-image-to-video",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "video-effects",
+      "endpoint": "video-effects",
+      "imageField": "image_url",
+      "imageAsList": false
+    },
+    {
+      "alias": "wan-effects",
+      "endpoint": "generate_wan_ai_effects",
+      "imageField": "image_url",
+      "imageAsList": false
+    }
+  ]
+}

@@ -1,0 +1,156 @@
+{
+  "name": "lifestyle-v1",
+  "version": 3,
+  "description": "Video-first lifestyle reel matched to the operator's reference Reel (seoul_jip_deco × yesimdiane): real footage, fast hard cuts (~1.8 s), one short single-line Korean caption per phrase, centred slightly below the middle, regular-weight white text with a thin dark edge.",
+  "reference": {
+    "source": "Operator reference Reel (Google Drive screen recording, 2026-10-09), measured with FFmpeg + pixel analysis; video area 1206x2028 visible of a 9:16 frame",
+    "shots": "~16 shots in ~27 s; mean ~1.7 s, range 0.9-3.5 s; hard cuts only, motion comes from handheld camera / in-camera whip pans",
+    "subtitle": "Korean caption centre ~56% of height, glyph ~47 px at 1080 wide, regular weight, white with thin dark edge, single line, centred; small English translation below at ~61% (~25 px)",
+    "persistentCta": "'댓글에 '타일' 남겨주세요' centre ~74.5%, ~41 px, visible for the whole video",
+    "footage": "creator on camera, hands handling the product, POV feet on the product, texture close-ups, wide shot of the space; natural daylight; no graphics or slides"
+  },
+  "canvas": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30
+  },
+  "safeArea": {
+    "top": 0.12,
+    "bottom": 0.2,
+    "side": 0.06
+  },
+  "shots": {
+    "minSec": 1.0,
+    "targetSec": 1.8,
+    "maxSec": 3.5,
+    "stretchToleranceSec": 1.0,
+    "clipHeadroomSec": 1.0
+  },
+  "shotlist": {
+    "framing": {
+      "HOOK": [
+        "미디엄 — 사람이 카메라를 보며 반응",
+        "클로즈업 — 문제 상황 디테일"
+      ],
+      "PROBLEM": [
+        "미디엄 — 불편한 상황",
+        "클로즈업 — 문제 디테일"
+      ],
+      "EMPATHY": [
+        "미디엄 — 불편한 상황을 지켜보는 시점",
+        "클로즈업 — 짜증 나는 디테일"
+      ],
+      "SOLUTION": [
+        "미디엄 — 손이 제품을 자연스럽게 가져옴",
+        "클로즈업 — 제품이 놓이는 순간",
+        "POV — 공간에 제품이 있는 모습"
+      ],
+      "DEMO": [
+        "클로즈업 — 손으로 제품 사용",
+        "POV — 사용하는 시점",
+        "미디엄 — 사람과 제품"
+      ],
+      "BENEFIT": [
+        "와이드 — 공간 전체",
+        "POV — 걷거나 지나가며",
+        "디테일 — 정리된 결과"
+      ],
+      "CTA": [
+        "제품 클로즈업",
+        "사람이 제품을 들고 카메라를 봄"
+      ]
+    }
+  },
+  "durationSec": {
+    "min": 20,
+    "max": 40,
+    "comment": "Brand target 20–40 s, set by the content (never padded). Checked on the script (pre-flight) and again on the real TTS voice before rendering (ttsTiming)."
+  },
+  "ttsTiming": {
+    "stretchWarnSec": 1.0,
+    "comment": "A scene whose voice needs this much more time than the script planned is reported (warning) — the scene is stretched, never cut."
+  },
+  "subtitle": {
+    "font": "NanumSquareRound",
+    "size": 48,
+    "bold": false,
+    "color": "&H00FFFFFF",
+    "outlineColor": "&H00000000",
+    "outline": 2,
+    "shadow": 1,
+    "shadowColor": "&H80000000",
+    "centerY": 0.56,
+    "maxLines": 1,
+    "maxWidthRatio": 0.62,
+    "lineHeight": 1.25,
+    "holdSec": 0.15,
+    "translation": {
+      "enabled": false,
+      "comment": "Operator decision: Korean subtitles only (the reference also shows a small English line)."
+    },
+    "emphasis": {
+      "enabled": false,
+      "color": "&H00E6FF&",
+      "comment": "Off by default: the reference Reel uses plain white captions. When on, the words Gemini plans as emphasis (production plan) are shown in this colour (ASS &HBBGGRR&)."
+    }
+  },
+  "persistentCta": {
+    "enabled": true,
+    "comment": "Operator decision (matches the reference): small comment-keyword line for the whole video, lower safe area. {키워드} = the reel's ManyChat keyword (PRODUCTS.'ManyChat 키워드' if set).",
+    "text": "댓글에 '{키워드}' 남겨주세요",
+    "centerY": 0.745,
+    "size": 38
+  },
+  "aiLabel": {
+    "enabled": true,
+    "comment": "Brand rule: AI-generated scenes (Google Flow footage) and AI interior visualizations carry a visible label so they are never mistaken for real product footage. Top-left inside the safe area.",
+    "text": "AI 시뮬레이션",
+    "size": 30
+  },
+  "narration": {
+    "leadInSec": 0.15,
+    "tailSec": 0.35,
+    "minCharsPerSec": 4.5,
+    "comment": "minCharsPerSec: conservative (slow) Korean speaking rate used to predict scene length before any TTS call; cached lines use their real duration."
+  },
+  "disclosure": {
+    "inVideo": false,
+    "comment": "Operator decision: the Coupang Partners disclosure goes in the Instagram caption (first line [광고] + full sentence), not in the video. Set inVideo to true to show it at the start and end of the video.",
+    "startSec": 2.5,
+    "onLastScene": true,
+    "size": 34,
+    "persistentTag": {
+      "enabled": false,
+      "text": "광고",
+      "size": 30
+    }
+  },
+  "assets": {
+    "minShortSide": 720,
+    "allowedSources": [
+      "flow-generated",
+      "own-footage",
+      "licensed"
+    ],
+    "defaultSource": "flow-generated",
+    "realProductBeats": [
+      "SOLUTION",
+      "DEMO",
+      "BENEFIT",
+      "CTA"
+    ],
+    "sceneClipMinSec": 4,
+    "maxFlatRatio": 0.5,
+    "minMotion": 0.15,
+    "comment": "One clip per scene (Google Flow: 8 s); the renderer takes several cuts from it. SOLUTION/DEMO/BENEFIT/CTA must show the product (operator checks it matches the real product at video review ③)."
+  },
+  "audio": {
+    "loudnessLufs": -16,
+    "keepClipAudio": false
+  },
+  "flowClip": {
+    "clipSec": 8,
+    "marginSec": 0.5,
+    "comment": "Google Flow clip length. Each clip must cover its part of a scene (≤ clipSec − marginSec); longer scenes need extra clips (S3b.mp4 …). The signed job's clipSec wins if present."
+  }
+}

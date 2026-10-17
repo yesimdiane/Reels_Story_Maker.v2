@@ -1,0 +1,266 @@
+// Products: product info → compliant extraction (or manual) → reference images → approved reference set.
+import { h, chip, icon, toast, modal, confirmDialog } from '../ui.js';
+import { state, act, go, setProduct } from '../state.js';
+import { api } from '../api.js';
+import { pageHead, asyncBlock, confirmPaid } from './common.js';
+import { imageIntake, savedControls } from './image-intake.js';
+import { catalog } from './catalog.js';
+import { analysisPanel, analysisOpen } from './product-analysis.js';
+
+const KIND_CHIP = { retrieved: ['원본 · 쇼핑몰 수집', 'mock'], uploaded: ['직접 업로드', ''], ai_generated: ['AI 생성 · 제조사 사진 아님', 'attention'] };
+const STATUS_CHIP = { pending: ['검토 대기', ''], approved: ['승인', 'done'], rejected: ['거절', 'err'], replaced: ['교체됨', 'mock'] };
+const EXTRACT_CHIP = { none: ['미수집', ''], ok: ['수집됨 · 확인 필요', 'done'], blocked: ['수집 차단 → 직접 입력', 'attention'], failed: ['수집 실패 → 직접 입력', 'attention'] };
+
+export function products() {
+  const wrap = h('div', { class: 'stack', style: 'gap:20px' });
+  const pid = state.productId;
+  if (!pid || location.hash.split('/').length < 3) return list(wrap);
+  return detail(wrap, pid);
+}
+
+/** Product code field shown on the always-visible cards (landing list and detail summary) while the code can still be set or changed. */
+function codeBox(p) {
+  if (p.codeLocked) return null;
+  const run = async (fn, ok) => { try { await fn(); if (ok) toast(ok); } catch (e) { toast(e.message, { error: true, recovery: e.recovery }); } await act(async () => null); };
+  const cf = { code: p.code || '' };
+  const inp = h('input', { type: 'text', value: cf.code, maxlength: 5, placeholder: p.suggestedCode || 'UMB', autocapitalize: 'characters', 'aria-label': '제품 코드', 'data-summary-code-input': '', style: 'width:110px;text-transform:uppercase', oninput: (e) => { cf.code = e.target.value.toUpperCase(); } });
+  return h('div', { class: 'stack', style: 'gap:4px', 'data-summary-code': '' },
+    h('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, inp,
+      !p.code && p.suggestedCode ? h('button', { class: 'btn sm ghost', type: 'button', onclick: () => { cf.code = p.suggestedCode; inp.value = p.suggestedCode; } }, '추천 ' + p.suggestedCode + ' 사용') : null,
+      h('button', { class: 'btn sm sage', type: 'button', 'data-summary-code-save': '', onclick: () => run(() => api.put('/api/products/' + p.id, { code: cf.code }), '제품 코드를 저장했습니다') }, '코드 저장')),
+    h('div', { class: 'small ' + (p.code ? 'muted' : ''), style: p.code ? '' : 'color:var(--clay)' }, p.code ? '첫 에피소드를 만들면 코드가 고정됩니다.' : '에피소드 ID(예: UMB-01-D)를 만들려면 제품 코드(영문 대문자 2~5자)가 필요합니다.'));
+}
+
+const REF_LABEL = { none: '없음', approved: '승인됨', waived: '이미지 없이 진행(기록됨)', stale: '재승인 필요' };
+const PRODUCT_STATUS = [['ready', '스토리 준비 완료'], ['needs', '준비 필요'], ['noref', '참조 이미지 미승인'], ['inuse', '에피소드 있음']];
+
+/** Product catalog landing page: real product images only (no placeholder art), opening a card just navigates to the existing editor. */
+function list(wrap) {
+  const items = (state.summary.products || []).map((p) => {
+    const eps = (p.linkedEpisodes || []).filter((e) => !e.archived);
+    const statuses = [p.readiness.ok ? 'ready' : 'needs'];
+    if (!['approved', 'waived'].includes(p.reference)) statuses.push('noref');
+    if (eps.length) statuses.push('inuse');
+    return { id: p.id, code: p.code || '', name: p.name || '', thumb: p.mainImage ? p.mainImage.url : '', status: statuses[0], statuses,
+      statusLabel: p.readiness.ok ? '스토리 준비 완료' : '준비 필요', tone: p.readiness.ok ? 'done' : 'attention', href: '#/products/' + p.id,
+      meta: [`이미지 ${p.images}장 · 참조 ${REF_LABEL[p.reference] || p.reference}`, '에피소드 ' + (eps.length ? eps.length + '개' : '없음')],
+      note: p.readiness.ok ? null : { text: '필요: ' + p.readiness.missing.join(', '), tone: 'warn' },
+      createdAt: p.createdAt || '', updatedAt: p.updatedAt || '', attr: { 'data-product-card': p.id } };
+  });
+  wrap.append(pageHead('Product Studio', '제품 스튜디오', '제품 카탈로그에서 제품을 고르면 정보·참조 이미지 편집기가 열립니다. 확인된 사실과 승인된 참조 이미지만 스토리 생성에 사용됩니다.'));
+  wrap.append(catalog({ id: 'products', items, statusOptions: PRODUCT_STATUS, searchPlaceholder: '제품 이름 · 코드로 검색', noImageText: '대표 이미지 없음',
+    emptyTitle: '제품이 없습니다', emptyText: '"새 제품"으로 쿠팡/기타 URL이나 제품 정보를 입력하세요.', noMatchText: '조건에 맞는 제품이 없습니다.',
+    create: { label: '새 제품', onClick: newProduct, attr: { 'data-new-product': '' } },
+    onOpen: (it) => { setProduct(it.id); location.hash = '#/products/' + it.id; } }));
+  return wrap;
+}
+
+function newProduct() {
+  const f = { name: '', url: '', affiliateUrl: '', description: '', features: '' };
+  modal((close) => h('div', { class: 'stack' },
+    h('h2', null, '새 제품'),
+    h('p', { class: 'small muted', style: 'margin:0' }, 'URL을 넣으면 공개된 페이지에서 제목·이미지·사양을 가져와 보려고 시도합니다(robots.txt 준수, 차단·로그인 우회 없음). 안 되면 직접 입력으로 이어집니다. 가져온 사양은 "미확인"으로 표시되며 확인해야 사용됩니다.'),
+    inp('제품 URL (쿠팡 등, 선택)', 'url', 'https://…', (v) => (f.url = v)),
+    inp('제품 이름', 'text', '', (v) => (f.name = v)),
+    inp('쿠팡 파트너스(제휴) 링크', 'url', '', (v) => (f.affiliateUrl = v)),
+    h('div', { class: 'field' }, h('label', null, '제품 설명 (선택)'), h('textarea', { rows: 2, oninput: (e) => (f.description = e.target.value) })),
+    h('div', { class: 'field' }, h('label', null, '확인된 기능·특징 (한 줄에 하나, 직접 확인한 것만)'), h('textarea', { rows: 3, oninput: (e) => (f.features = e.target.value) })),
+    h('div', { class: 'row end' }, h('button', { class: 'btn ghost', onclick: close }, '취소'), h('button', { class: 'btn', onclick: async () => {
+      const r = await act(() => api.post('/api/products', { name: f.name, url: f.url, affiliateUrl: f.affiliateUrl, description: f.description, features: f.features.split('\n').map((x) => x.trim()).filter(Boolean) }), { ok: '제품을 만들었습니다' });
+      if (r && r.id) { close(); setProduct(r.id); if (f.url) { try { await api.post(`/api/products/${r.id}/extract`); } catch (e) { toast(e.message, { error: true, recovery: e.recovery }); } } location.hash = '#/products/' + r.id; }
+    } }, '만들기'))));
+}
+const inp = (label, type, ph, on) => h('div', { class: 'field' }, h('label', null, label), h('input', { type, placeholder: ph, oninput: (e) => on(e.target.value) }));
+
+function detail(wrap, pid) {
+  return asyncBlock(() => api.get('/api/products/' + pid), (p) => draw(p));
+}
+
+function draw(p) {
+  const wrap = h('div', { class: 'stack', style: 'gap:20px' });
+  const reload = () => import('../state.js').then(({ hooks }) => hooks.rerender());
+  const run = async (fn, ok) => { try { await fn(); if (ok) toast(ok); } catch (e) { toast(e.message, { error: true, recovery: e.recovery }); } await act(async () => null); };
+  wrap.append(pageHead('Product Studio · ' + p.id, p.name || '제품', 'A 제품 정보 → B 참조 이미지 → C 승인. 모든 단계는 저장되고 다시 열어도 유지됩니다.',
+    h('button', { class: 'btn ghost', onclick: () => { location.hash = '#/products'; } }, '목록'),
+    h('button', { class: 'btn sage', disabled: !p.readiness.ok, onclick: () => { location.hash = '#/storylab/' + p.id; } }, '스토리 랩으로 →')));
+
+  // ---- status & linked episodes ----
+  wrap.append(h('div', { class: 'card row between', style: 'gap:12px;flex-wrap:wrap' },
+    h('div', { class: 'row', style: 'gap:8px' }, chip(p.readiness.ok ? '스토리 준비 완료' : '준비 필요', p.readiness.ok ? 'done' : 'attention'), chip('참조 세트: ' + ({ none: '미승인', approved: '승인됨', waived: '이미지 없이 진행', stale: '재승인 필요' }[p.reference.state] || p.reference.state), p.reference.approved ? 'done' : 'attention')),
+    h('div', { class: 'small' }, h('b', null, '연결된 에피소드: '), p.linkedEpisodes.length ? p.linkedEpisodes.map((e, i) => [i ? ', ' : '', h('a', { href: '#/script/' + e.id, onclick: () => { state.episodeId = e.id; } }, e.id)]) : '아직 없음 (스토리 승인 후 만들어집니다)')));
+
+  // ---- A. info ----
+  const f = { price: (p.price && p.price.text) || '', name: p.name, category: p.category, url: p.url, affiliateUrl: p.affiliateUrl, description: p.description, forbidden: (p.forbiddenClaims || []).join(', '), specs: p.specs.map((s) => ({ text: s.text, verified: s.verified, source: s.source })), code: p.code || '' };
+  const ex = p.extraction || { status: 'none' };
+  const specBox = h('div', { class: 'stack', style: 'gap:8px' });
+  const drawSpecs = () => specBox.replaceChildren(...f.specs.map((s, i) => h('div', { class: 'row', style: 'flex-wrap:nowrap' },
+    h('input', { type: 'text', value: s.text, 'aria-label': '사양/기능', oninput: (e) => (s.text = e.target.value) }),
+    h('label', { class: 'small row', style: 'gap:6px;white-space:nowrap' }, h('input', { type: 'checkbox', checked: !!s.verified, onchange: (e) => (s.verified = e.target.checked) }), '확인됨'),
+    chip(s.source === 'extracted' ? '추출됨' : '직접 입력', s.source === 'extracted' ? 'attention' : ''),
+    h('button', { class: 'btn icon danger', 'aria-label': '삭제', onclick: () => { f.specs.splice(i, 1); drawSpecs(); } }, icon('trash')))), h('button', { class: 'btn sm ghost', onclick: () => { f.specs.push({ text: '', verified: true, source: 'manual' }); drawSpecs(); } }, icon('plus'), '기능/사양 추가'));
+  drawSpecs();
+  wrap.append(h('div', { class: 'card stack', style: 'gap:14px' },
+    h('div', { class: 'card-head' }, h('h2', null, 'A · 제품 정보'), h('div', { class: 'row' }, chip(...EXTRACT_CHIP[ex.status] || EXTRACT_CHIP.none), h('button', { class: 'btn sm ghost', disabled: !p.url, onclick: () => run(() => api.post(`/api/products/${p.id}/extract`), 'URL 수집을 시도했습니다') }, icon('refresh'), 'URL에서 가져오기'))),
+    ex.note ? h('div', { class: 'banner ' + (ex.status === 'ok' ? 'ok' : 'warn') }, h('div', null, ex.note, ex.imageFailures && ex.imageFailures.length ? h('div', { class: 'small' }, `이미지 ${ex.imageFailures.length}장은 가져오지 못했습니다.`) : null)) : null,
+    h('div', { class: 'grid two' }, fld('제품 이름', f.name, (v) => (f.name = v)), fld('카테고리', f.category, (v) => (f.category = v)), fld('제품 URL', f.url, (v) => (f.url = v)), fld('쿠팡 파트너스(제휴) 링크', f.affiliateUrl, (v) => (f.affiliateUrl = v))),
+    h('div', { class: 'field', 'data-product-code': '' }, h('label', null, '제품 코드 (에피소드 ID의 앞부분 · 예: UMB-01-D)'),
+      h('div', { class: 'row', style: 'flex-wrap:nowrap' },
+        h('input', { type: 'text', value: f.code, maxlength: 5, placeholder: p.suggestedCode || 'UMB', disabled: !!p.codeLocked, autocapitalize: 'characters', 'aria-label': '제품 코드', style: 'width:110px;text-transform:uppercase', oninput: (e) => (f.code = e.target.value.toUpperCase()) }),
+        !p.code && p.suggestedCode ? h('button', { class: 'btn sm ghost', type: 'button', onclick: (e) => { f.code = p.suggestedCode; e.target.closest('.row').querySelector('input').value = p.suggestedCode; } }, '추천 ' + p.suggestedCode + ' 사용') : null),
+      h('div', { class: 'small muted' }, p.codeLocked ? '이미 에피소드 ID에 쓰여 바꿀 수 없습니다.' : p.code ? '첫 에피소드를 만들면 코드가 고정됩니다.' : '에피소드를 만들려면 먼저 코드를 정하세요 (영문 대문자 2~5자). 첫 에피소드를 만들면 고정됩니다.')),
+    h('div', { class: 'field' }, h('label', null, '가격 (직접 입력 · 선택)'), h('input', { type: 'text', value: f.price, placeholder: '예: 12,900원 (확인한 날짜 기준)', oninput: (e) => (f.price = e.target.value) }), h('div', { class: 'small muted' }, p.price ? `${p.price.note} · 입력: ${new Date(p.price.enteredAt).toLocaleDateString('ko-KR')}` : '가격은 자동 수집하지 않습니다. 입력하지 않으면 영상·대본에 가격을 쓰지 않습니다.')),
+    h('div', { class: 'field' }, h('label', null, '제품 설명'), h('textarea', { rows: 2, oninput: (e) => (f.description = e.target.value) }, f.description)),
+    h('div', { class: 'field' }, h('label', null, '확인된 기능·사양 — "확인됨"으로 표시된 것만 스토리 생성에 사용됩니다'), specBox),
+    fld('금지 표현 (쉼표로 구분 — 영상/대본에서 쓰면 안 되는 제품 주장)', f.forbidden, (v) => (f.forbidden = v)),
+    h('div', { class: 'row end' }, h('button', { class: 'btn', onclick: () => run(() => api.put('/api/products/' + p.id, { code: f.code, price: { text: f.price }, name: f.name, category: f.category, url: f.url, affiliateUrl: f.affiliateUrl, description: f.description, specs: f.specs, forbiddenClaims: f.forbidden.split(',').map((x) => x.trim()).filter(Boolean) }), '저장했습니다') }, '저장')),
+    p.url ? h('p', { class: 'small muted', style: 'margin:0' }, '출처 URL: ' + p.url + ' · 가격·할인·평점은 수집하지 않으며 제품 사실은 직접 확인한 것만 사용합니다.') : null));
+
+  // ---- B. images ----
+  const dz = imageIntake({ product: p, run, rerender: () => act(async () => null) });
+  const imgs = p.images;
+  const card = (im) => {
+    const inSet = (p.reference.imageIds || []).includes(im.id);
+    const rep = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp', style: 'display:none', onchange: async (e) => {
+      const file = e.target.files[0]; e.target.value = '';
+      if (!file) return;
+      const guarded = im.status === 'approved' || inSet;
+      if (guarded && !(await confirmDialog({ title: '승인된 참조 이미지를 교체할까요?', body: '교체하면 참조 세트를 다시 승인해야 합니다. 기존 이미지는 "교체됨"으로 남습니다.', confirm: '교체', tone: 'danger' }))) return;
+      await run(() => api.upload(`/api/products/${p.id}/images/${im.id}/replace${guarded ? '?confirm=1' : ''}`, file), '이미지를 교체했습니다');
+    } });
+    const set = (status) => run(() => api.post(`/api/products/${p.id}/images/${im.id}/status`, { status }));
+    return h('figure', { class: 'ref' + (im.status === 'approved' ? ' ok' : ''), style: im.status === 'replaced' ? 'opacity:.5' : '' },
+      h('img', { src: im.url, alt: im.label || '제품 이미지' }),
+      h('figcaption', null,
+        h('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, chip(...KIND_CHIP[im.kind]), chip(...STATUS_CHIP[im.status]), im.primary ? chip('대표', 'done') : null),
+        im.width ? h('div', { class: 'small muted' }, `${im.width}×${im.height}px`) : null,
+        h('div', { class: 'small' }, im.label || ''),
+        im.disclosure ? h('div', { class: 'small', style: 'color:var(--clay)' }, im.disclosure) : null,
+        im.licenseNote ? h('div', { class: 'small muted' }, im.licenseNote) : null,
+        im.kind === 'ai_generated' ? h('div', { class: 'small muted mono' }, (im.provider || '') + ' / ' + (im.model || '')) : null,
+        im.status === 'replaced' ? null : h('div', { class: 'row', style: 'gap:6px' },
+          h('button', { class: 'btn sm ' + (im.status === 'approved' ? 'ghost' : 'sage'), onclick: () => set(im.status === 'approved' ? 'pending' : 'approved') }, im.status === 'approved' ? '승인 취소' : '승인'),
+          h('button', { class: 'btn sm danger', disabled: im.status === 'rejected', onclick: () => set('rejected') }, '거절'),
+          rep, h('button', { class: 'btn sm ghost', onclick: () => rep.click() }, '교체'),
+          im.kind === 'ai_generated' ? h('button', { class: 'btn sm ghost', onclick: () => compare(p, im) }, '원본과 비교') : null),
+        im.status === 'replaced' ? null : savedControls(p, im, imgs.filter((i) => i.kind !== 'ai_generated' && i.status !== 'replaced'), run)));
+  };
+  const approvedOrig = imgs.filter((i) => i.kind !== 'ai_generated' && i.status === 'approved');
+  wrap.append(h('div', { class: 'card stack', style: 'gap:14px' },
+    h('div', { class: 'card-head' }, h('h2', null, 'B · 참조 이미지'), h('div', { class: 'row' },)),
+    h('div', { class: 'banner' }, icon('lock'), h('div', null, '쇼핑몰에서 가져온 이미지는 광고·AI 변형 사용 권한이 확인되지 않았습니다. AI 생성 이미지는 항상 "AI 생성"으로 표시되며 제조사 사진으로 쓰이지 않습니다. 제품의 모양·로고·색상·기능을 바꾼 이미지는 승인하지 마세요.')),
+    imgs.filter((i) => i.kind !== 'ai_generated').length ? h('div', { class: 'ref-grid', style: 'grid-template-columns:repeat(auto-fill,minmax(170px,1fr))' }, imgs.filter((i) => i.kind !== 'ai_generated').map(card)) : h('div', { class: 'empty' }, '이미지가 없습니다. 업로드하거나 URL에서 가져오세요.'),
+    dz));
+
+  // ---- B2. AI reference studio: generations side by side ----
+  const gens = p.generations || [];
+  const byId = (id) => imgs.find((i) => i.id === id);
+  const chooseOne = (im) => run(() => api.post(`/api/products/${p.id}/images/${im.id}/choose`), `v${im.version}을 선택했습니다 (같은 요청의 나머지 대기 버전은 거절됨)`);
+  const genBlock = (g, n) => {
+    const vers = g.imageIds.map(byId).filter(Boolean);
+    const srcs = (g.basedOn || []).map(byId).filter(Boolean);
+    return h('div', { class: 'card flat stack', style: 'gap:10px' },
+      h('div', { class: 'row between' }, h('b', null, `생성 #${gens.length - n} · ${g.style === 'product' ? '사실적 제품 사진' : '2D 애니/웹툰'}`), h('span', { class: 'small muted' }, g.prompt ? '요청: ' + g.prompt : '요청 문구 없음')),
+      h('div', { class: 'ref-grid', style: 'grid-template-columns:repeat(auto-fill,minmax(210px,1fr))' },
+        srcs.map((o) => h('figure', { class: 'ref' }, h('img', { src: o.url, alt: '기준 원본' }), h('figcaption', null, chip('기준 원본', 'mock'), h('div', { class: 'small muted' }, o.label || '')))),
+        vers.map((im) => h('figure', { class: 'ref' + (im.status === 'approved' ? ' ok' : ''), style: im.status === 'rejected' ? 'opacity:.55' : '' },
+          h('img', { src: im.url, alt: `AI 생성 v${im.version}` }),
+          h('figcaption', null,
+            h('div', { class: 'row', style: 'gap:6px' }, chip(`v${im.version}`, 'attention'), chip(...STATUS_CHIP[im.status])),
+            h('div', { class: 'small muted mono' }, (im.provider || '') + ' / ' + (im.model || '')),
+            im.decisionNote ? h('div', { class: 'small muted' }, im.decisionNote) : null,
+            h('div', { class: 'row', style: 'gap:6px' },
+              h('button', { class: 'btn sm sage', disabled: im.status === 'approved' || im.status === 'rejected', onclick: () => chooseOne(im) }, '이 버전 선택'),
+              h('button', { class: 'btn sm danger', disabled: im.status === 'rejected', onclick: () => run(() => api.post(`/api/products/${p.id}/images/${im.id}/status`, { status: 'rejected' })) }, '거절'),
+              im.status === 'rejected' ? h('button', { class: 'btn sm ghost', onclick: () => run(() => api.post(`/api/products/${p.id}/images/${im.id}/status`, { status: 'pending' })) }, '되돌리기') : null))))),
+      h('div', { class: 'row' }, h('button', { class: 'btn sm ghost', disabled: !srcs.some((o) => o.status === 'approved'), onclick: () => genDialog(p, approvedOrig, g) }, '같은 설정으로 다시 생성…')));
+  };
+  wrap.append(h('div', { class: 'card stack', style: 'gap:14px' },
+    h('div', { class: 'card-head' }, h('h2', null, 'B2 · AI 참조 이미지 (생성 이력)'), h('button', { class: 'btn sm', disabled: !approvedOrig.length, onclick: () => genDialog(p, approvedOrig) }, icon('plus'), '새로 생성…')),
+    approvedOrig.length ? null : h('div', { class: 'banner warn' }, icon('lock'), h('div', null, '먼저 위에서 원본/업로드 이미지를 하나 이상 승인하세요. 승인된 이미지가 AI 생성의 기준(source of truth)입니다. 이미지 생성을 쓰지 않으려면 직접 업로드한 이미지를 승인하고 C 단계로 가면 됩니다.')),
+    gens.length ? gens.map(genBlock) : h('div', { class: 'empty' }, '아직 AI로 만든 참조 이미지가 없습니다. 생성하지 않고 직접 업로드한 이미지만으로도 진행할 수 있습니다.')));
+
+  // ---- C. reference set approval ----
+  const r = p.reference;
+  const approvedIds = imgs.filter((i) => i.status === 'approved').map((i) => i.id);
+  wrap.append(h('div', { class: 'card stack', style: 'gap:12px' },
+    h('div', { class: 'card-head' }, h('h2', null, 'C · 참조 세트 승인'), chip(({ none: '미승인', approved: '승인됨', stale: '재승인 필요', waived: '이미지 없이 진행' })[r.state], r.approved ? 'done' : 'attention')),
+    r.state === 'approved' ? h('p', { class: 'small', style: 'margin:0' }, `${r.imageIds.length}장 승인 · ${new Date(r.at).toLocaleString('ko-KR')} · 세트 해시 ${r.hash.slice(0, 10)}. 이미지가 바뀌면 자동으로 무효가 됩니다.`) : null,
+    r.state === 'stale' ? h('div', { class: 'banner warn' }, r.note) : null,
+    r.state === 'waived' ? h('p', { class: 'small', style: 'margin:0' }, '사유: ' + r.waived) : null,
+    p.readiness.ok ? h('div', { class: 'banner ok' }, '스토리 랩에서 사용할 준비가 되었습니다.') : h('div', { class: 'banner warn' }, h('div', null, '필요: ' + p.readiness.missing.join(', '))),
+    h('div', { class: 'row' },
+      h('button', { class: 'btn sage', disabled: !approvedIds.length, onclick: () => run(() => api.post(`/api/products/${p.id}/references/approve`, { imageIds: approvedIds }), '참조 이미지 세트를 승인했습니다') }, icon('check'), `승인된 이미지 ${approvedIds.length}장을 참조 세트로 승인`),
+      h('button', { class: 'btn ghost', onclick: waive }, '이미지 없이 진행…'))));
+  async function waive() {
+    const reason = prompt('이미지 없이 진행하는 이유를 적으세요 (기록됩니다)');
+    if (reason) await run(() => api.post(`/api/products/${p.id}/references/waive`, { reason }), '기록했습니다');
+  }
+  void reload;
+  // ---- default view: summary first; everything else folded ----
+  const [head, , A, B, B2, C] = Array.from(wrap.children);
+  const fold = (title, badge, open, el) => h('details', { class: 'fold', open: open || undefined, 'data-fold': title }, h('summary', null, h('b', null, title), badge ? h('span', { class: 'small muted' }, badge) : null), el);
+  const refChip = ({ none: ['참조 미승인', 'attention'], approved: ['참조 승인됨', 'done'], stale: ['참조 재승인 필요', 'attention'], waived: ['이미지 없이 진행', 'mock'] })[p.reference.state];
+  const live = p.linkedEpisodes.filter((e) => !e.archived);
+  const summary = h('section', { class: 'card prod-summary', 'data-product-summary': p.id },
+    p.mainImage ? h('img', { class: 'prod-main', src: p.mainImage.url, alt: '대표 참조 이미지' }) : h('div', { class: 'prod-main empty' }, '대표 이미지 없음'),
+    h('div', { class: 'stack', style: 'gap:8px;min-width:0' },
+      h('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, h('span', { class: 'ep-code' }, p.code || '코드 없음'), chip(...refChip), chip(p.readiness.ok ? '스토리 준비 완료' : '준비 필요', p.readiness.ok ? 'done' : 'attention')),
+      codeBox(p),
+      h('h2', { style: 'margin:0;overflow-wrap:anywhere' }, p.name || '제품'),
+      p.url ? h('a', { class: 'small', href: p.url, target: '_blank', rel: 'noopener', style: 'overflow-wrap:anywhere' }, p.url) : h('div', { class: 'small muted' }, '제품 링크 없음 (직접 입력)'),
+      h('div', { class: 'small' }, h('b', null, '연결된 에피소드: '), live.length ? live.map((e, i) => [i ? ', ' : '', h('a', { href: '#/script/' + e.id, onclick: () => { state.episodeId = e.id; } }, e.displayId || e.id)]) : '없음'),
+      p.readiness.ok ? null : h('div', { class: 'small', style: 'color:var(--clay)' }, '필요: ' + p.readiness.missing.join(', ')),
+      h('div', { class: 'row' }, h('button', { class: 'btn sage', type: 'button', 'data-create-story': p.id, disabled: !p.readiness.ok, title: p.readiness.ok ? '' : '필요: ' + p.readiness.missing.join(', '), onclick: () => { location.hash = '#/storylab/' + p.id; } }, '스토리 만들기 →'))));
+  wrap.replaceChildren(head, summary,
+    fold('제품 정보 · 사양 · 금지 표현', '확인된 사실만 스토리에 쓰입니다', false, A),
+    fold('참조 이미지', `${p.counts.uploaded}/${p.limits.uploads}장 업로드`, p.reference.state !== 'approved', B),
+    fold('제품 구조 설명 (AI 시각 분석)', (p.analysisApprovedV ? `승인됨 v${p.analysisApprovedV}` : '승인 전') + (p.analysisImagesChanged ? ' · 이미지가 바뀜 — 재분석 필요' : ' · 스토리보드 이미지에 자동 포함'), analysisOpen(p) || p.analysisImagesChanged || (!p.analysisApprovedV && (p.images || []).length > 0), analysisPanel(p)),
+    fold('AI 참조 이미지 생성 이력', '번호가 붙은 버전 · 추가 참조 최대 5장', false, B2),
+    C);
+  return wrap;
+}
+
+const fld = (label, value, on) => h('div', { class: 'field' }, h('label', null, label), h('input', { type: 'text', value, oninput: (e) => on(e.target.value) }));
+
+function compare(p, im) {
+  const src = (im.derivedFrom || []).map((id) => p.images.find((x) => x.id === id)).filter(Boolean);
+  modal((close) => h('div', { class: 'stack' }, h('h2', null, '원본 vs AI 생성'),
+    h('div', { class: 'grid two' },
+      h('div', { class: 'stack', style: 'gap:6px' }, h('b', null, '원본 (승인됨)'), src.map((s) => h('img', { src: s.url, alt: '원본', style: 'width:100%;border-radius:12px;border:1px solid var(--line)' }))),
+      h('div', { class: 'stack', style: 'gap:6px' }, h('b', null, 'AI 생성'), h('img', { src: im.url, alt: 'AI 생성', style: 'width:100%;border-radius:12px;border:1px solid var(--line)' }))),
+    h('p', { class: 'small muted', style: 'margin:0' }, '제품의 모양·비율·로고·글자·색상·기능이 원본과 같은지 확인한 뒤에만 승인하세요. 다르면 거절하세요.'),
+    h('div', { class: 'row end' }, h('button', { class: 'btn', onclick: close }, '닫기')), ), { wide: true });
+}
+
+async function genDialog(p, originals, prev = null) {
+  const sel = new Set(prev ? (prev.basedOn || []).filter((i) => originals.some((o) => o.id === i)) : originals.slice(0, 2).map((i) => i.id));
+  const extra = new Set(prev ? prev.extraRefs || [] : []);
+  const pool = p.images.filter((i) => i.kind !== 'ai_generated' && !['rejected', 'replaced'].includes(i.status) && !originals.some((o) => o.id === i.id && sel.has(o.id)));
+  let prompt = prev ? prev.prompt || '' : '';
+  let style = prev && prev.style ? prev.style : 'anime';
+  const body = () => ({ basedOn: [...sel], extraImageIds: [...extra].filter((i) => !sel.has(i)), style, prompt });
+  if (!sel.size && originals.length) sel.add(originals[0].id);
+  const route = ((state.summary.ai || {}).routing || []).find((r) => r.task === 'imageGeneration') || { provider: 'mock' };
+  const blocked = route.provider !== 'gemini';
+  modal((close) => h('div', { class: 'stack' }, h('h2', null, prev ? 'AI 참조 이미지 다시 생성' : 'AI 참조 이미지 만들기'),
+    h('p', { class: 'small muted', style: 'margin:0' }, '승인된 원본을 기준으로 2D 애니/웹툰 스타일의 제품 참조 이미지를 만듭니다. 제품 모양·비율·로고·색상·기능은 바꾸지 않도록 지시하지만 결과가 다를 수 있으므로 반드시 원본과 비교한 뒤 승인하세요. 결과는 항상 "AI 생성"으로 표시됩니다.'),
+    h('div', { class: 'field' }, h('label', null, '기준이 될 승인된 원본 (필수)'),
+      h('div', { class: 'ref-grid' }, originals.map((o) => h('label', { class: 'ref' }, h('img', { src: o.url, alt: '' }), h('figcaption', null, h('span', { class: 'row small', style: 'gap:6px' }, h('input', { type: 'checkbox', checked: sel.has(o.id), onchange: (e) => (e.target.checked ? sel.add(o.id) : sel.delete(o.id)) }), o.label || o.id)))))),
+    h('div', { class: 'field' }, h('label', null, '추가 참조 이미지 (선택, 최대 5장 — 다른 각도·디테일)'),
+      pool.length ? h('div', { class: 'ref-grid' }, pool.map((o) => h('label', { class: 'ref' }, h('img', { src: o.url, alt: '' }), h('figcaption', null, h('span', { class: 'row small', style: 'gap:6px' }, h('input', { type: 'checkbox', checked: extra.has(o.id), onchange: (e) => { if (e.target.checked) { if (extra.size >= 5) { e.target.checked = false; return toast('추가 참조는 최대 5장입니다', { error: true }); } extra.add(o.id); } else extra.delete(o.id); } }), o.label || o.id))))) : h('div', { class: 'small muted' }, '추가로 쓸 이미지가 없습니다. 위 B 단계에서 이미지를 올리면 여기에 나타납니다.')),
+    h('div', { class: 'field' }, h('label', null, '스타일'), h('select', { onchange: (e) => (style = e.target.value) }, h('option', { value: 'anime', selected: style === 'anime' }, '2D 애니/웹툰 (기본)'), h('option', { value: 'product', selected: style === 'product' }, '사실적 제품 사진'))),
+    h('div', { class: 'field' }, h('label', null, '변형 요청 (배경/각도/조명만, 선택)'), h('textarea', { rows: 2, placeholder: '예: 밝은 원목 현관 벽 앞, 정면', oninput: (e) => (prompt = e.target.value) }, prompt)),
+    blocked ? h('div', { class: 'banner warn' }, h('div', null, h('b', null, '이미지 생성 제공자가 연결되지 않았습니다. '), 'Settings → AI 연동에서 Gemini 키를 저장하고 이미지 생성이 가능한 모델을 "제품 이미지 생성" 작업에 지정하세요. 그 전까지는 직접 업로드한 이미지로 진행할 수 있습니다. (샘플 이미지로 성공한 것처럼 보이지 않습니다.)')) : null,
+    h('div', { class: 'row end' }, h('button', { class: 'btn ghost', onclick: close }, '취소'), h('button', { class: 'btn clay', disabled: blocked, onclick: async () => {
+      if (!sel.size) return toast('기준 원본을 하나 이상 선택하세요', { error: true });
+      let est;
+      try { est = await api.post(`/api/products/${p.id}/images/estimate`, body()); } catch (e) { return toast(e.message, { error: true, recovery: e.recovery }); }
+      const c = await confirmPaid({ title: 'AI 이미지 생성 (유료일 수 있음)', est, confirmLabel: '생성' });
+      if (!c) return;
+      close();
+      try { await api.post(`/api/products/${p.id}/images/generate`, Object.assign(body(), { confirm: c })); toast('AI 이미지를 만들었습니다 (원본과 비교 후 한 버전을 선택하세요)'); } catch (e) { toast(e.message, { error: true, recovery: e.recovery }); }
+      await act(async () => null);
+    } }, '비용 확인 후 생성…'))), { wide: true });
+}
+
+void go; void confirmDialog;

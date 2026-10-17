@@ -1,0 +1,27 @@
+# CI only: runs tests and a Docker build check on pull requests. It is NOT the backend and deploys nothing.
+name: tests
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg fontconfig fonts-nanum
+      # Stand-in for the brand font (NanumSquareRound, not packaged for Linux) so render tests are deterministic. See the script header.
+      - run: bash scripts/ci-fonts.sh
+      - run: npm test
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t rf-studio:ci .
+      - name: smoke test (production guards + /healthz)
+        run: |
+          docker run -d --name rf -p 8080:8080 -e RF_MASTER_KEY=ci-master-key-0123456789abcdef -e RF_ADMIN_PASSWORD=ci-admin-password-1 -v rfdata:/data rf-studio:ci
+          for i in $(seq 30); do curl -sf localhost:8080/healthz && exit 0; sleep 1; done
+          docker logs rf; exit 1

@@ -1,0 +1,63 @@
+{
+  "comment": "Video model registry. Muapi documents the submit/poll protocol but NOT a per-model price list or a complete parameter list. Entries below are limited to what the official docs show and are 'unverified': live generation stays blocked until the operator confirms the endpoint in the MuAPI playground (Settings) or a real job completes. Confirm the endpoint and parameters for any model on the Muapi playground before the first live run, and enter your own per-clip price estimate in Settings (prices are never invented here).",
+  "models": [
+    {
+      "id": "kling-master",
+      "label": "Kling v2.1 Master · image-to-video",
+      "provider": "muapi",
+      "endpoint": "kling-v2.1-master-i2v",
+      "mode": "image-to-video",
+      "promptField": "prompt",
+      "imageField": "image_url",
+      "durations": [
+        5,
+        10
+      ],
+      "aspectRatios": [
+        "16:9",
+        "9:16",
+        "1:1"
+      ],
+      "supportsNegativePrompt": true,
+      "lipSync": false,
+      "verification": "unverified",
+      "docsUrl": "https://muapi.ai/cli",
+      "notes": "Endpoint from the official muapi-cli registry (I2V_MODELS['kling-master'] = kling-v2.1-master-i2v). The earlier value 'kling-master' was copied from a text-to-video docs example and is not the image-to-video endpoint. Durations 5/10 s and 9:16 come from the Kling guide. Still unverified until you confirm it in the MuAPI playground or a real job completes. The docs do not list a price."
+    },
+    {
+      "id": "seedance-2.5",
+      "label": "Seedance 2.5 · image-to-video",
+      "provider": "muapi",
+      "endpoint": "seedance-2.5-image-to-video",
+      "mode": "image-to-video",
+      "promptField": "prompt",
+      "imageField": "image_url",
+      "durationField": "duration",
+      "durations": [
+        5
+      ],
+      "aspectRatios": [
+        "9:16"
+      ],
+      "resolutions": [
+        "480p",
+        "720p",
+        "1080p",
+        "4k"
+      ],
+      "resolutionField": "resolution",
+      "extraParams": {
+        "resolution": "480p",
+        "seed": -1,
+        "high_bitrate": false,
+        "draft": false
+      },
+      "omitAspectRatio": true,
+      "supportsNegativePrompt": false,
+      "lipSync": false,
+      "verification": "unverified",
+      "docsUrl": "https://muapi.ai/playground/seedance-2.5-image-to-video/llms.txt",
+      "notes": "Official MuAPI per-model llms.txt: prompt/image_url required; 480p, 720p, 1080p, 4k; up to 30 sec; default 5 sec. 480p selected for cheaper trials. Draft mode requires 480p; finalization via completed draft_request_id requires 1080p and explicit new authorization. Cost depends on parameters; do not assume fixed credit cost."
+    }
+  ]
+}

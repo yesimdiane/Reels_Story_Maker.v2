@@ -1,0 +1,215 @@
+{
+  "id": "EP01",
+  "reelId": "PRD-001-EP01",
+  "productId": "PRD-001",
+  "title": "남편은 못 고쳐도, 현관은 고칠 수 있다.",
+  "titleEn": "Husband can't be fixed, but the entryway can",
+  "series": "Jack & Diane",
+  "product": {
+    "id": "PRD-001",
+    "name": "리템 우산꽂이 자석형",
+    "kind": "magnetic door-mounted umbrella holder",
+    "verifiedFeatures": [
+      "호환되는 철제 표면에 자석으로 부착 가능",
+      "상단·하단 분리형 (상단 190×55×50mm, 하단 188×55×82mm)",
+      "장우산과 접이식 우산 모두 수납 가능",
+      "색상: 다크그레이, 그레이, 화이트"
+    ],
+    "forbiddenClaims": [
+      "드릴",
+      "무타공",
+      "방수",
+      "배수",
+      "물 빠짐",
+      "최강",
+      "100%",
+      "no-drill",
+      "waterproof",
+      "drainage"
+    ],
+    "affiliateUrl": "",
+    "sourceNote": "Features copied from the repository README (First product) / Sheets fixture. Product photos and the affiliate URL must be added by the operator; footage rights are not assumed.",
+    "visualSummary": "A two-piece magnetic umbrella holder: a separate upper piece and lower piece that attach with magnets to a compatible steel surface such as a steel front door; it holds both long and folding umbrellas; available in dark gray, gray or white."
+  },
+  "characters": [
+    "jack",
+    "diane"
+  ],
+  "beats": [
+    "Jack confidently refuses to carry an umbrella in Seoul.",
+    "An absurd Korean monsoon begins.",
+    "A bus roof leaks, a storm drain erupts, and Jack struggles through exaggerated flooding.",
+    "Jack reaches their hilltop home completely soaked.",
+    "Diane refuses to let him drip water inside and throws him a towel.",
+    "Diane sees an opportunity to buy a magnetic umbrella holder on Coupang.",
+    "Diane excitedly shows Jack her purchase.",
+    "Jack lovingly praises her but still refuses to use an umbrella."
+  ],
+  "scenes": [
+    {
+      "id": "S1",
+      "title": "Jack refuses the umbrella",
+      "beat": 1,
+      "durationSec": 4,
+      "characters": [
+        "jack"
+      ],
+      "showsProduct": false,
+      "visual": "Seoul street, grey sky. Jack strides past a convenience store umbrella rack, shakes his head with a smug, dry smile."
+    },
+    {
+      "id": "S2",
+      "title": "The absurd monsoon begins",
+      "beat": 2,
+      "durationSec": 4,
+      "characters": [
+        "jack"
+      ],
+      "showsProduct": false,
+      "visual": "The sky cracks open. Cartoonishly huge raindrops hammer the street; Jack's smile freezes."
+    },
+    {
+      "id": "S3",
+      "title": "Bus leak, storm drain, flood",
+      "beat": 3,
+      "durationSec": 5,
+      "characters": [
+        "jack"
+      ],
+      "showsProduct": false,
+      "visual": "Inside a bus the roof leaks on Jack; outside a storm drain erupts like a fountain and exaggerated flood water sweeps the street. Obvious comedic exaggeration, not documentary."
+    },
+    {
+      "id": "S4",
+      "title": "Soaked at the hilltop home",
+      "beat": 4,
+      "durationSec": 4,
+      "characters": [
+        "jack"
+      ],
+      "showsProduct": false,
+      "visual": "Jack trudges up the hill and reaches the front door of their home, completely soaked, hair plastered down."
+    },
+    {
+      "id": "S5",
+      "title": "Diane throws the towel",
+      "beat": 5,
+      "durationSec": 4,
+      "characters": [
+        "jack",
+        "diane"
+      ],
+      "showsProduct": false,
+      "visual": "Diane blocks the doorway with a hand up, refusing to let him drip inside, then throws a towel that lands on his head."
+    },
+    {
+      "id": "S6",
+      "title": "Diane spots the shopping excuse",
+      "beat": 6,
+      "durationSec": 4,
+      "characters": [
+        "diane"
+      ],
+      "showsProduct": true,
+      "visual": "Diane's eyes light up as she scrolls Coupang on her phone and taps order on a magnetic umbrella holder."
+    },
+    {
+      "id": "S7",
+      "title": "BABYYYY! Look what I got",
+      "beat": 7,
+      "durationSec": 5,
+      "characters": [
+        "jack",
+        "diane"
+      ],
+      "showsProduct": true,
+      "visual": "Diane proudly points to the two-piece magnetic umbrella holder attached to the steel front door; Jack, towel on shoulders, looks at it."
+    },
+    {
+      "id": "S8",
+      "title": "Jack still refuses",
+      "beat": 8,
+      "durationSec": 5,
+      "characters": [
+        "jack",
+        "diane"
+      ],
+      "showsProduct": true,
+      "visual": "Jack praises her warmly with a thumbs-up, then dryly walks off without an umbrella; Diane throws her hands up in mock outrage."
+    }
+  ],
+  "lines": [
+    {
+      "id": "L1",
+      "sceneId": "S7",
+      "speaker": "diane",
+      "en": "BABYYYY!!!!!! LOOK WHAT I GOT!!!",
+      "ko": "자기야아아아!!!!!! 이거 봐, 내가 뭐 샀게!!!"
+    },
+    {
+      "id": "L2",
+      "sceneId": "S8",
+      "speaker": "jack",
+      "en": "Good job, baby!",
+      "ko": "잘했어, 자기야!"
+    },
+    {
+      "id": "L3",
+      "sceneId": "S8",
+      "speaker": "jack",
+      "en": "But I'm still not gonna use it.",
+      "ko": "그래도 난 안 쓸 거야."
+    },
+    {
+      "id": "L4",
+      "sceneId": "S8",
+      "speaker": "diane",
+      "en": "BABE!!!",
+      "ko": "자기야!!!"
+    }
+  ],
+  "suggestions": [
+    {
+      "source": "docs/jack-diane-production.md (PR #19 draft)",
+      "sceneId": "S1",
+      "speaker": "jack",
+      "en": "I'm British. We don't need umbrellas.",
+      "ko": "나는 영국인이야. 우리한텐 우산 필요 없어."
+    },
+    {
+      "source": "docs/jack-diane-production.md (PR #19 draft)",
+      "sceneId": "S3",
+      "speaker": "jack",
+      "en": "Oh no... OH NO!",
+      "ko": "안 돼... 안 돼에!"
+    },
+    {
+      "source": "docs/jack-diane-production.md (PR #19 draft)",
+      "sceneId": "S4",
+      "speaker": "jack",
+      "en": "I JUST WANNA GO HOME!",
+      "ko": "집에 가고 싶다고!"
+    },
+    {
+      "source": "docs/jack-diane-production.md (PR #19 draft)",
+      "sceneId": "S5",
+      "speaker": "diane",
+      "en": "Korean rain is different! Don't come in! Dry yourself first!",
+      "ko": "한국 비는 달라! 들어오지 마! 먼저 몸부터 말려!"
+    }
+  ],
+  "cta": {
+    "lines": [
+      "남편은 못 고쳐도, 현관은 고칠 수 있다.",
+      "문에 붙이는 우산꽂이 ☂️",
+      "댓글에 ‘우산’ 남기면 링크 드림!"
+    ],
+    "durationSec": 3.5,
+    "keyword": "우산"
+  },
+  "publishing": {
+    "keyword": "우산",
+    "affiliateUrl": "",
+    "disclosure": "[광고] 이 게시물은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."
+  }
+}

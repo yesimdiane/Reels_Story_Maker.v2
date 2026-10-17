@@ -1,0 +1,40 @@
+{
+  "style": {
+    "name": "Jack & Diane house style",
+    "summary": "Hand-drawn 2D Korean webtoon / anime animation. Warm, muted beige and earthy colour palette. Consistent faces and body proportions. Expressive, cinematic acting. Not 3D, not Pixar-style, not photorealistic.",
+    "promptBlock": "Hand-drawn 2D Korean webtoon / anime animation, cel-shaded, soft ink linework, warm muted beige and earthy palette, consistent character faces and body proportions, expressive cinematic acting, vertical 9:16 framing. NOT 3D, NOT Pixar-style, NOT photorealistic.",
+    "negativePrompt": "3D render, Pixar style, CGI, photorealistic, glossy plastic skin, neon colors, text, watermark, logo, extra fingers, deformed face, off-model character"
+  },
+  "characters": [
+    {
+      "id": "diane",
+      "name": "Diane",
+      "nameKo": "다이앤",
+      "role": "Korean wife",
+      "look": "Korean woman with long dark hair, expressive eyes and consistent facial proportions.",
+      "personality": ["playful", "impulsive", "mischievous", "energetic", "obsessed with discovering products on Coupang"],
+      "catchphrase": "BABYYYY!!!!!!",
+      "catchphraseNote": "When she gets excited about a product she yells this.",
+      "forbiddenWords": ["오빠"],
+      "forbiddenNote": "Diane never calls Jack \"오빠\".",
+      "promptBlock": "Diane: Korean woman, long dark hair, expressive eyes, playful and mischievous, big energetic expressions",
+      "voice": { "provider": "heygen", "language": "en", "heygenVoiceId": "", "heygenIdentityId": "", "speed": 1.0, "verified": false, "verifiedAt": "" },
+      "references": []
+    },
+    {
+      "id": "jack",
+      "name": "Jack",
+      "nameKo": "잭",
+      "role": "British husband",
+      "look": "British man with wavy light-brown hair, a neatly groomed mustache, a stocky solid build and distinctive tattoos on his arms (visible when the arms are visible).",
+      "personality": ["mature", "patient", "affectionate", "protective", "dryly humorous", "genuinely encourages Diane even when he does not intend to use the product"],
+      "catchphrase": "",
+      "catchphraseNote": "",
+      "forbiddenWords": [],
+      "forbiddenNote": "",
+      "promptBlock": "Jack: British man, wavy light-brown hair, neatly groomed mustache, stocky solid build, arm tattoos when visible, calm and dryly funny",
+      "voice": { "provider": "heygen", "language": "en", "heygenVoiceId": "", "heygenIdentityId": "d51329d270cf407490b88693cda054e0", "speed": 1.0, "verified": false, "verifiedAt": "" },
+      "references": []
+    }
+  ]
+}
