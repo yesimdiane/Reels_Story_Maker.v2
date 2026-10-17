@@ -10,7 +10,7 @@
 const fs = require('node:fs');
 const { StudioError, nowIso, sha256, canonical } = require('./util');
 
-const MAX_ANALYSIS_IMAGES = 4;
+const MAX_ANALYSIS_IMAGES = 5;
 const MAX_TEXT = 8000;
 const MAX_ITEM = 400;
 const SECTIONS = [
@@ -21,6 +21,8 @@ const SECTIONS = [
   ['proportions', 'RELATIVE PROPORTIONS'],
   ['mounting', 'MOUNTING AND INSTALLATION FEATURES'],
   ['details', 'DISTINGUISHING VISUAL DETAILS'],
+  ['labels_text', 'EXACT VISIBLE BRAND LOGO AND CONTROL LABELS'],
+  ['usage', 'DOCUMENTED PRODUCT FUNCTIONS (WITH SOURCE AND UNCERTAINTY)'],
 ];
 const FIXED_NEGATIVES = [
   'Do not change the number, size or arrangement of any component, compartment or divider listed above.',
@@ -31,17 +33,21 @@ const FIXED_NEGATIVES = [
 const SAMPLE_MARK = '[SAMPLE — NOT AN ANALYSIS OF THIS PRODUCT]';
 
 const SYSTEM = [
-  'You are a meticulous product photo analyst. You receive one or more REFERENCE PHOTOS of the same physical product.',
-  'Write a factual structure description that an image generation model can follow to redraw the SAME product without morphing it.',
-  'RULES: describe ONLY what is actually visible. Count components exactly as visible; if the count is unclear (occluded, cropped, ambiguous), say so and mark it uncertain.',
-  'Never invent dimensions, weights, materials, brand names, internal mechanisms, hidden parts or features. Give a number only when it is clearly printed or countable; otherwise describe relative proportions in words (e.g. "about twice as tall as wide") and mark them uncertain unless the photo makes them evident.',
-  'Use plain, specific English. Every statement is either "verified" (clearly visible in at least one photo) or "uncertain" (inferred, partially visible, or inconsistent between photos).',
-  'Answer with ONE JSON object only (no markdown) of this exact shape:',
-  '{"component_count":{"count":<integer or null>,"basis":"<what exactly was counted>","certain":<true|false>},',
-  ' "items":[{"section":"shape|components|color_material|compartments|proportions|mounting|details","statement":"<one short factual sentence>","status":"verified|uncertain"}],',
-  ' "not_visible":["<things a viewer cannot see in these photos, e.g. the back side, the inside, the underside>"],',
-  ' "negative_constraints":["<product-specific things an artist must NOT do to avoid morphing this product>"]}',
-].join('\n');
+  'ROLE: Senior product research analyst and image-reference art director for a short-form shopping reel.',
+  'INPUT: 1-5 product screenshots plus optional product name, product description and operator-confirmed specifications. Analyze all screenshots as one product. A screenshot may be a collage or contain sales claims. Never guess unreadable text.',
+  'GOAL A — VISUAL LOCK: Precisely describe the product for consistent image generation: silhouette, proportions, finish, color, handles, lid, seams, control-panel geometry, screen, buttons, logo position and camera-view differences. Record exact visible Korean/English labels where legible; otherwise mark unreadable, never invent.',
+  'GOAL B — FUNCTIONS: Separate visible controls/text, operator-provided verified specifications, and unverified marketing claims. A control label is not proof of a performance claim. Never infer hidden hardware, inner materials, safety certifications, speed, warranty or recipe quantities.',
+  'GOAL C — CREATIVE VALUE: Identify visual details worth preserving and realistic everyday usage context. Do not confuse screenshot review quotes with manufacturer facts. Do not claim to have independently tested the product.',
+  'EVIDENCE: For every item label status as "verified" only if directly visible in supplied photos or explicitly present in operator-confirmed specs; otherwise "uncertain". Include a concise source clue in each statement, e.g. "front close-up" or "provided specs".',
+  'PRIORITY: PRODUCT ACCURACY over marketing language. Distinguish photograph content from claims printed on a page. Treat reviews as subjective accounts, not product facts.',
+  'OUTPUT: English, concise but detailed; ONE JSON object (no markdown) exactly compatible with this schema:',
+  '{"component_count":{"count":<integer or null>,"basis":"<what was counted>","certain":<true|false>},',
+  ' "items":[{"section":"shape|components|color_material|compartments|proportions|mounting|details|labels_text|usage","statement":"<specific short sentence including source clue>","status":"verified|uncertain"}],',
+  ' "not_visible":["<important unseen geometry or unreadable label>"],',
+  ' "negative_constraints":["<product-specific generation mistake to avoid>"]}',
+  'Provide 4-8 shape/details observations and 2-6 label/control observations when visible. If evidence is thin, return fewer items instead of hallucinating.',
+  'Negative constraints must explicitly prevent hallucinated buttons, fake logos/text, altered lid/handle shapes and wrong colors. Do not put unsupported capabilities into verified items.',
+].join('\\n');
 
 const clean = (v, n = MAX_ITEM) => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
 
@@ -124,7 +130,17 @@ function createProductAnalysis({ products, router, log = () => {} }) {
   }
 
   function userPrompt(p, ids) {
-    return [`PRODUCT_NAME: ${p.name || '(unnamed)'}`, `CATEGORY: ${p.category || '(unknown)'}`, `You will receive ${ids.length} reference photo(s) of this product, each preceded by a label. Analyze them together as ONE product.`, 'Return the JSON object described in the system message.'].join('\n');
+    const known = (p.specs || []).filter((s) => s.verified).slice(0, 20).map((s) => '- ' + String(s.text || '').slice(0, 300));
+    const review = p.reviewResearch?.approved ? p.reviewResearch.analysis : null;
+    return [
+      'PRODUCT NAME (operator/retailer, not proof of visible label): ' + (p.name || '(unknown)'),
+      'CATEGORY: ' + (p.category || '(unknown)'),
+      'OPERATOR-CONFIRMED SPECS (source: operator; do not label as photo-visible):', ...(known.length ? known : ['none']),
+      'PRODUCT DESCRIPTION (potential marketing claims; verify independently before promotion): ' + (p.description || '(none)').slice(0, 1400),
+      'APPROVED CUSTOMER REVIEW THEMES (subjective research only, not verified product facts): ' + (review ? [review.summary, ...(review.pros || []), ...(review.cons || [])].filter(Boolean).join('; ').slice(0, 900) : '(none)'),
+      'There are ' + ids.length + ' source product screenshots attached. Read their visible geometry, text and control layout before relying on product name or sales copy.',
+      'Output the specified JSON, suitable for a precise image-reference description. If an image contains a collage, identify distinct viewpoints without assuming separate products.',
+    ].join('\\n');
   }
   function imageInputs(p, ids) {
     const files = products.imageFiles(p.id, ids);
