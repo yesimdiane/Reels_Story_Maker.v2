@@ -139,6 +139,11 @@ function createApp(studio, { token = '', port = 0, host = '127.0.0.1', log = () 
   route('GET', '/api/products/:id', async ({ p }) => S.products.get(p.id));
   route('PUT', '/api/products/:id', async ({ p, body }) => S.products.edit(p.id, body));
   route('POST', '/api/products/:id/extract', async ({ p }) => S.products.extract(p.id));
+  route('POST', '/api/products/:id/reviews/image', async ({ p, raw, headers }) => S.products.uploadReview(p.id, raw, decodeURIComponent(headers['x-filename'] || 'review.png')), { upload: true });
+  route('PUT', '/api/products/:id/reviews', async ({ p, body }) => S.products.saveReviews(p.id, body.text));
+  route('POST', '/api/products/:id/reviews/estimate', async ({ p }) => S.products.reviewsEstimate(p.id));
+  route('POST', '/api/products/:id/reviews/analyze', async ({ p, body }) => S.products.analyzeReviews(p.id, body.confirm));
+  route('POST', '/api/products/:id/reviews/approve', async ({ p, body }) => S.products.approveReviews(p.id, body.approved === true));
   route('POST', '/api/products/:id/images', async ({ p, raw, headers, query }) => S.products.upload(p.id, raw, decodeURIComponent(headers['x-filename'] || 'image.png'), { label: query.label, source: query.source }), { upload: true });
   route('POST', '/api/products/:id/images/generate', async ({ p, body }) => S.products.generateImage(p.id, { basedOn: body.basedOn || [], extraImageIds: body.extraImageIds || [], style: body.style || 'anime', prompt: body.prompt, confirm: body.confirm }));
   route('POST', '/api/products/:id/images/:iid/choose', async ({ p }) => S.products.chooseVersion(p.id, p.iid));
@@ -544,6 +549,7 @@ function createApp(studio, { token = '', port = 0, host = '127.0.0.1', log = () 
 
   // ---- media (ids only) ----
   route('GET', '/media/product/:a/:b', async ({ p }) => ({ file: S.mediaFile('product', p.a, p.b) }));
+  route('GET', '/media/product-review/:a/:b', async ({ p }) => ({ file: S.products.reviewMediaFile(p.a, Number(p.b)) }));
   route('GET', '/media/ref/:a/:b', async ({ p }) => ({ file: S.mediaFile('ref', p.a, p.b) }));
   route('GET', '/media/lipsync/:a/:b/:c', async ({ p }) => ({ file: S.mediaFile('lipsync', p.a, p.b, p.c) }));
   route('GET', '/media/clip/:a/:b/:c', async ({ p }) => ({ file: S.mediaFile('clip', p.a, p.b, p.c) }));
