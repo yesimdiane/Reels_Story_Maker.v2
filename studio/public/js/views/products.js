@@ -300,6 +300,7 @@ function draw(p) {
     'Product: ' + (p.name || 'unnamed product'),
     'Preserve the exact silhouette, dimensions, color, handles, controls, logo, and any readable text from the uploaded source photos.',
     ...((p.specs || []).filter((s) => s.verified).slice(0, 8).map((s) => 'Verified feature: ' + s.text)),
+    ...((p.analyses || []).filter((a) => a.status === 'approved' && a.v === p.analysisApprovedV).map((a) => 'Approved visual structure analysis:\n' + (a.text || '').slice(0, 1500))),
     'Neutral background, clear front or three-quarter angle, no extra invented parts.',
     'Do not use customer review screenshots as product shape references.'
   ].join('\n');
