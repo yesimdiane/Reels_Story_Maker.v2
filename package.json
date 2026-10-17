@@ -1,3 +1,4 @@
+
 {
   "name": "reels-factory",
   "version": "2.3.0",
@@ -6,6 +7,8 @@
   "scripts": {
     "build": "node scripts/build-bundle.js",
     "test": "node --test tests/*.test.js",
+    "test:quick": "node --test tests/frontend-syntax.test.js tests/episode-project.test.js tests/timeline-pointer-drag.test.js",
+    "test:full": "npm test",
     "render:check": "node renderer/cli.js check",
     "render:estimate": "node renderer/cli.js estimate",
     "render": "node renderer/cli.js render",
