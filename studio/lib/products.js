@@ -334,6 +334,21 @@ function createProductService({ store, router, extractFn = extractProduct, downl
     return view(p);
   }
 
+  async function approveUploadedImages(id, imageIds) {
+    const ids = Array.isArray(imageIds) ? imageIds : [];
+    if (!ids.length || ids.length > 10 || new Set(ids).size !== ids.length) throw new StudioError('BAD_IMAGES', '승인할 업로드 이미지 1~10장을 선택하세요.', { status: 422 });
+    await update(id, (p) => {
+      for (const iid of ids) {
+        const im = p.images.find((x) => x.id === iid);
+        if (!im || im.kind !== 'uploaded' || im.removed || im.status !== 'pending') throw new StudioError('BAD_IMAGES', '승인 대기 중인 직접 업로드 제품 이미지만 전체 승인할 수 있습니다.', { status: 409 });
+      }
+      for (const im of p.images) if (ids.includes(im.id)) {
+        im.status = 'approved'; im.decidedBy = 'operator'; im.decidedAt = nowIso();
+      }
+    });
+    return view(get(id));
+  }
+
   const MAX_EXTRA_REFS = 5;
   const STYLES = {
     anime: 'Render it as a clean 2D anime / Korean webtoon illustration: confident ink outlines, flat cel shading, soft studio lighting, simple uncluttered background. It must still be recognisably the SAME product.',
@@ -503,7 +518,7 @@ function createProductService({ store, router, extractFn = extractProduct, downl
     return path.join(dirOf(id), im.file);
   }
 
-  return { uploadReview, saveReviews, reviewsEstimate, analyzeReviews, approveReviews, reviewMediaFile, list, get: (id) => view(get(id)), raw: get, mutate: update, create, edit, extract, upload, replace, removeImage, reorderImages, setPrimary, setStatus, generateImage, chooseVersion, imageCount, approveReferenceSet, waiveReferences, bindingFor, imageFiles, mediaFile, lockCodeSync, suggestCode, referenceState, verifiedFacts, readiness, MAX_UPLOADS, MIN_SIDE, MAX_SIDE };
+  return { approveUploadedImages, uploadReview, saveReviews, reviewsEstimate, analyzeReviews, approveReviews, reviewMediaFile, list, get: (id) => view(get(id)), raw: get, mutate: update, create, edit, extract, upload, replace, removeImage, reorderImages, setPrimary, setStatus, generateImage, chooseVersion, imageCount, approveReferenceSet, waiveReferences, bindingFor, imageFiles, mediaFile, lockCodeSync, suggestCode, referenceState, verifiedFacts, readiness, MAX_UPLOADS, MIN_SIDE, MAX_SIDE };
 }
 
 module.exports = { createProductService, KIND_LABEL, MAX_UPLOADS, MIN_SIDE, MAX_SIDE };
