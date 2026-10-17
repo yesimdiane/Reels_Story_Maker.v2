@@ -169,7 +169,7 @@ function draw(p) {
     let estimate;
     try { estimate = await api.post('/api/products/' + p.id + '/reviews/estimate'); }
     catch (err) { toast(err.message, { error: true }); return; }
-    const confirm = await confirmPaid({ estimate, title: '리뷰 3개 AI 분석', description: '리뷰 캡처와 원문을 AI 모델에 전송해 장점·단점·구매 동기·코미디 상황을 분석합니다. 유료 모델이면 비용이 발생합니다.' });
+    const confirm = await confirmPaid({ est: estimate, title: '리뷰 3개 AI 분석', body: h('p', { class: 'small' }, '리뷰 캡처와 원문을 AI 모델에 전송해 장점·단점·구매 동기·코미디 상황을 분석합니다.') });
     if (!confirm) return;
     try { await api.post('/api/products/' + p.id + '/reviews/analyze', { confirm }); toast('리뷰 분석 초안이 생성됐습니다. 내용을 확인하고 승인해 주세요.'); await act(async () => null); }
     catch (err) { toast(err.message, { error: true, recovery: err.recovery }); }
