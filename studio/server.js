@@ -144,6 +144,7 @@ function createApp(studio, { token = '', port = 0, host = '127.0.0.1', log = () 
   route('POST', '/api/products/:id/reviews/estimate', async ({ p }) => S.products.reviewsEstimate(p.id));
   route('POST', '/api/products/:id/reviews/analyze', async ({ p, body }) => S.products.analyzeReviews(p.id, body.confirm));
   route('POST', '/api/products/:id/reviews/approve', async ({ p, body }) => S.products.approveReviews(p.id, body.approved === true));
+  route('POST', '/api/products/:id/images/approve-uploaded', async ({ p, body }) => S.products.approveUploadedImages(p.id, body.imageIds));
   route('POST', '/api/products/:id/images', async ({ p, raw, headers, query }) => S.products.upload(p.id, raw, decodeURIComponent(headers['x-filename'] || 'image.png'), { label: query.label, source: query.source }), { upload: true });
   route('POST', '/api/products/:id/images/generate', async ({ p, body }) => S.products.generateImage(p.id, { basedOn: body.basedOn || [], extraImageIds: body.extraImageIds || [], style: body.style || 'anime', prompt: body.prompt, confirm: body.confirm }));
   route('POST', '/api/products/:id/images/:iid/choose', async ({ p }) => S.products.chooseVersion(p.id, p.iid));

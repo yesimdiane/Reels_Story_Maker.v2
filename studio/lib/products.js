@@ -193,7 +193,7 @@ function createProductService({ store, router, extractFn = extractProduct, downl
           p.code = next;
         }
       }
-      ['name', 'category', 'description', 'url', 'affiliateUrl'].forEach((k) => patch[k] !== undefined && (p[k] = String(patch[k]).trim().slice(0, k === 'description' ? 3000 : 300)));
+      ['name', 'category', 'description', 'url', 'affiliateUrl', 'referencePrompt'].forEach((k) => patch[k] !== undefined && (p[k] = String(patch[k]).trim().slice(0, ['description','referencePrompt'].includes(k) ? 3000 : 300)));
       if (patch.url) require('./extract').parseUrl(patch.url);
       if (patch.price !== undefined) p.price = cleanPrice(patch.price);
       if (Array.isArray(patch.forbiddenClaims)) p.forbiddenClaims = patch.forbiddenClaims.map(String).filter(Boolean);
@@ -262,6 +262,7 @@ function createProductService({ store, router, extractFn = extractProduct, downl
     const p = await update(id, (p) => {
       if (!buffer || !buffer.length) throw new StudioError('EMPTY_FILE', '빈 파일입니다.', { status: 400 });
       if (p.images.filter((i) => i.kind === 'uploaded' && i.status !== 'replaced').length >= MAX_UPLOADS) throw new StudioError('UPLOAD_LIMIT', `업로드는 최대 ${MAX_UPLOADS}장입니다. 기존 이미지를 삭제하거나 교체하세요.`, { status: 409 });
+      if (p.images.filter((i) => i.kind === 'uploaded' && !i.removed && i.status !== 'replaced').length + (p.reviewResearch?.images || []).length >= 10) throw new StudioError('UPLOAD_LIMIT', '제품과 리뷰 이미지는 합쳐 최대 10장입니다.', { status: 409 });
       saveImage(p, id, { buffer, filename, kind: 'uploaded', label, extra: { source: ['paste', 'drop', 'file', 'crop'].includes(source) ? source : 'file' } });
     });
     return view(p);
@@ -331,6 +332,21 @@ function createProductService({ store, router, extractFn = extractProduct, downl
       im.decidedAt = nowIso();
     });
     return view(p);
+  }
+
+  async function approveUploadedImages(id, imageIds) {
+    const ids = Array.isArray(imageIds) ? imageIds : [];
+    if (!ids.length || ids.length > 10 || new Set(ids).size !== ids.length) throw new StudioError('BAD_IMAGES', '승인할 업로드 이미지 1~10장을 선택하세요.', { status: 422 });
+    await update(id, (p) => {
+      for (const iid of ids) {
+        const im = p.images.find((x) => x.id === iid);
+        if (!im || im.kind !== 'uploaded' || im.removed || im.status !== 'pending') throw new StudioError('BAD_IMAGES', '승인 대기 중인 직접 업로드 제품 이미지만 전체 승인할 수 있습니다.', { status: 409 });
+      }
+      for (const im of p.images) if (ids.includes(im.id)) {
+        im.status = 'approved'; im.decidedBy = 'operator'; im.decidedAt = nowIso();
+      }
+    });
+    return view(get(id));
   }
 
   const MAX_EXTRA_REFS = 5;
@@ -427,7 +443,7 @@ function createProductService({ store, router, extractFn = extractProduct, downl
     if (!dim || Math.min(dim.width, dim.height) < 100 || Math.max(dim.width, dim.height) > MAX_SIDE) throw new StudioError('BAD_REVIEW_IMAGE', '유효한 리뷰 이미지가 아닙니다.', { status: 422 });
     const p = await update(id, (p) => {
       p.reviewResearch ||= { images: [], text: '', analysis: null, approved: false };
-      if (p.reviewResearch.images.length >= 3) throw new StudioError('REVIEW_LIMIT', '리뷰 캡처는 최대 3장입니다.', { status: 409 });
+      if (p.reviewResearch.images.length + p.images.filter((i) => i.kind === 'uploaded' && !i.removed && i.status !== 'replaced').length >= 10) throw new StudioError('REVIEW_LIMIT', '제품과 리뷰 이미지는 합쳐 최대 10장입니다.', { status: 409 });
       const hash = sha256(buffer);
       if (p.reviewResearch.images.some((i) => i.hash === hash)) throw new StudioError('DUPLICATE', '이미 추가한 리뷰입니다.', { status: 409 });
       const file = 'review_' + hash.slice(0, 12) + sn.ext;
@@ -502,7 +518,7 @@ function createProductService({ store, router, extractFn = extractProduct, downl
     return path.join(dirOf(id), im.file);
   }
 
-  return { uploadReview, saveReviews, reviewsEstimate, analyzeReviews, approveReviews, reviewMediaFile, list, get: (id) => view(get(id)), raw: get, mutate: update, create, edit, extract, upload, replace, removeImage, reorderImages, setPrimary, setStatus, generateImage, chooseVersion, imageCount, approveReferenceSet, waiveReferences, bindingFor, imageFiles, mediaFile, lockCodeSync, suggestCode, referenceState, verifiedFacts, readiness, MAX_UPLOADS, MIN_SIDE, MAX_SIDE };
+  return { approveUploadedImages, uploadReview, saveReviews, reviewsEstimate, analyzeReviews, approveReviews, reviewMediaFile, list, get: (id) => view(get(id)), raw: get, mutate: update, create, edit, extract, upload, replace, removeImage, reorderImages, setPrimary, setStatus, generateImage, chooseVersion, imageCount, approveReferenceSet, waiveReferences, bindingFor, imageFiles, mediaFile, lockCodeSync, suggestCode, referenceState, verifiedFacts, readiness, MAX_UPLOADS, MIN_SIDE, MAX_SIDE };
 }
 
 module.exports = { createProductService, KIND_LABEL, MAX_UPLOADS, MIN_SIDE, MAX_SIDE };

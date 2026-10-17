@@ -151,7 +151,7 @@ function draw(p) {
   const reviewText = h('textarea', { rows: 5, placeholder: '리뷰 원문을 붙여 넣어도 됩니다. 리뷰별로 구분해 주세요.', 'aria-label': '리뷰 원문' }, rr.text || '');
   const reviewFile = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp', multiple: true, 'aria-label': '리뷰 스크린샷', onchange: async (e) => {
     const files = Array.from(e.target.files || []); e.target.value = '';
-    if (files.length + (rr.images || []).length > 3) return toast('리뷰 스크린샷은 최대 3장입니다.', { error: true });
+    if (files.length + (rr.images || []).length + p.images.filter((im) => im.kind === 'uploaded' && !im.removed && im.status !== 'replaced').length > 10) return toast('제품과 리뷰 스크린샷은 합쳐 최대 10장입니다.', { error: true });
     for (const file of files) {
       try { await api.upload('/api/products/' + p.id + '/reviews/image', file); }
       catch (err) { toast(err.message, { error: true, recovery: err.recovery }); return; }
@@ -174,10 +174,10 @@ function draw(p) {
     try { await api.post('/api/products/' + p.id + '/reviews/analyze', { confirm }); toast('리뷰 분석 초안이 생성됐습니다. 내용을 확인하고 승인해 주세요.'); await act(async () => null); }
     catch (err) { toast(err.message, { error: true, recovery: err.recovery }); }
   };
-  wrap.append(h('div', { class: 'card stack', style: 'gap:12px', 'data-product-reviews': p.id },
-    h('div', { class: 'card-head' }, h('h2', null, '리뷰 리서치 · 최대 3개'), chip(rr.approved ? '분석 승인' : '미승인', rr.approved ? 'done' : 'attention')),
+  const reviewBlock = h('div', { class: 'stack', style: 'gap:12px', 'data-product-reviews': p.id },
+    h('div', { class: 'card-head' }, h('h2', null, '리뷰 리서치 · 총 업로드 10장 이내'), chip(rr.approved ? '분석 승인' : '미승인', rr.approved ? 'done' : 'attention')),
     h('p', { class: 'small muted' }, '리뷰는 소비자 개인 경험입니다. 확인된 제품 사양이 아니므로 광고 문구에 사실처럼 사용하지 않습니다. 리뷰 캡처는 제품 레퍼런스 사진과 분리됩니다.'),
-    h('div', { class: 'field' }, h('label', null, '리뷰 스크린샷 (최대 3장)'), reviewFile),
+    h('div', { class: 'field' }, h('label', null, '리뷰 스크린샷 (제품 포함 총 10장)'), reviewFile),
     h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' }, ...(rr.images || []).map((im, i) =>
       h('figure', { style: 'margin:0;width:110px' }, h('img', { src: '/media/product-review/' + p.id + '/' + i, alt: '리뷰 캡처 ' + (i + 1), style: 'width:100%;height:110px;object-fit:contain' }), h('figcaption', { class: 'small muted' }, '리뷰 ' + (i + 1))))),
     h('div', { class: 'field' }, h('label', null, '리뷰 원문 (선택)'), reviewText),
@@ -192,7 +192,7 @@ function draw(p) {
       h('button', { class: 'btn sage', disabled: !!rr.approved, onclick: async () => {
         try { await api.post('/api/products/' + p.id + '/reviews/approve', { approved: true }); toast('리뷰 분석이 승인되었습니다.'); await act(async () => null); }
         catch (err) { toast(err.message, { error: true }); }
-      } }, rr.approved ? '승인됨' : '내용 확인 후 승인')) : null));
+      } }, rr.approved ? '승인됨' : '내용 확인 후 승인')) : null);
 
   // ---- B. images ----
   const dz = imageIntake({ product: p, run, rerender: () => act(async () => null) });
@@ -223,9 +223,18 @@ function draw(p) {
           im.kind === 'ai_generated' ? h('button', { class: 'btn sm ghost', onclick: () => compare(p, im) }, '원본과 비교') : null),
         im.status === 'replaced' ? null : savedControls(p, im, imgs.filter((i) => i.kind !== 'ai_generated' && i.status !== 'replaced'), run)));
   };
+  const waitingUploaded = imgs.filter((i) => i.kind === 'uploaded' && i.status === 'pending' && !i.removed);
+  const approveUploadedButton = h('button', { class: 'btn sm sage', type: 'button', disabled: !waitingUploaded.length, 'data-approve-uploaded-all': '',
+    onclick: async () => {
+      const ids = waitingUploaded.map((i) => i.id);
+      if (!ids.length) return;
+      const yes = await confirmDialog({ title: '제품 참조 이미지 전체 승인', body: '직접 업로드한 제품 이미지 ' + ids.length + '장을 모두 승인할까요? 리뷰와 AI 생성 이미지는 포함되지 않습니다.', confirm: '전체 승인' });
+      if (!yes) return;
+      await run(() => api.post('/api/products/' + p.id + '/images/approve-uploaded', { imageIds: ids }), ids.length + '장의 제품 참조 이미지를 승인했습니다.');
+    } }, '업로드 이미지 전체 승인 (' + waitingUploaded.length + ')');
   const approvedOrig = imgs.filter((i) => i.kind !== 'ai_generated' && i.status === 'approved');
   wrap.append(h('div', { class: 'card stack', style: 'gap:14px' },
-    h('div', { class: 'card-head' }, h('h2', null, 'B · 참조 이미지'), h('div', { class: 'row' },)),
+    h('div', { class: 'card-head' }, h('h2', null, 'B · 참조 이미지'), h('div', { class: 'row' }, chip('승인 ' + imgs.filter((i) => i.kind === 'uploaded' && i.status === 'approved').length + '/' + imgs.filter((i) => i.kind === 'uploaded' && !i.removed && i.status !== 'replaced').length), approveUploadedButton)),
     h('div', { class: 'banner' }, icon('lock'), h('div', null, '쇼핑몰에서 가져온 이미지는 광고·AI 변형 사용 권한이 확인되지 않았습니다. AI 생성 이미지는 항상 "AI 생성"으로 표시되며 제조사 사진으로 쓰이지 않습니다. 제품의 모양·로고·색상·기능을 바꾼 이미지는 승인하지 마세요.')),
     imgs.filter((i) => i.kind !== 'ai_generated').length ? h('div', { class: 'ref-grid', style: 'grid-template-columns:repeat(auto-fill,minmax(170px,1fr))' }, imgs.filter((i) => i.kind !== 'ai_generated').map(card)) : h('div', { class: 'empty' }, '이미지가 없습니다. 업로드하거나 URL에서 가져오세요.'),
     dz));
@@ -290,12 +299,59 @@ function draw(p) {
       h('div', { class: 'small' }, h('b', null, '연결된 에피소드: '), live.length ? live.map((e, i) => [i ? ', ' : '', h('a', { href: '#/script/' + e.id, onclick: () => { state.episodeId = e.id; } }, e.displayId || e.id)]) : '없음'),
       p.readiness.ok ? null : h('div', { class: 'small', style: 'color:var(--clay)' }, '필요: ' + p.readiness.missing.join(', ')),
       h('div', { class: 'row' }, h('button', { class: 'btn sage', type: 'button', 'data-create-story': p.id, disabled: !p.readiness.ok, title: p.readiness.ok ? '' : '필요: ' + p.readiness.missing.join(', '), onclick: () => { location.hash = '#/storylab/' + p.id; } }, '스토리 만들기 →'))));
-  wrap.replaceChildren(head, summary,
-    fold('제품 정보 · 사양 · 금지 표현', '확인된 사실만 스토리에 쓰입니다', false, A),
-    fold('참조 이미지', `${p.counts.uploaded}/${p.limits.uploads}장 업로드`, p.reference.state !== 'approved', B),
-    fold('제품 구조 설명 (AI 시각 분석)', (p.analysisApprovedV ? `승인됨 v${p.analysisApprovedV}` : '승인 전') + (p.analysisImagesChanged ? ' · 이미지가 바뀜 — 재분석 필요' : ' · 스토리보드 이미지에 자동 포함'), analysisOpen(p) || p.analysisImagesChanged || (!p.analysisApprovedV && (p.images || []).length > 0), analysisPanel(p)),
-    fold('AI 참조 이미지 생성 이력', '번호가 붙은 버전 · 추가 참조 최대 5장', false, B2),
-    C);
+  // Streamlined workflow: one intake, analysis, editable image prompt, and story handoff.
+  const productImages = imgs.filter((i) => i.kind !== 'ai_generated' && !['replaced','rejected'].includes(i.status));
+  const productCount = productImages.filter((i) => i.kind === 'uploaded').length;
+  const reviewCount = (rr.images || []).length;
+  const totalCount = productCount + reviewCount;
+  const defaultPrompt = [
+    'Create an accurate, clean product reference image for use in animated storyboard generation.',
+    'Product: ' + (p.name || 'unnamed product'),
+    'Preserve the exact silhouette, dimensions, color, handles, controls, logo, and any readable text from the uploaded source photos.',
+    ...((p.specs || []).filter((s) => s.verified).slice(0, 8).map((s) => 'Verified feature: ' + s.text)),
+    ...((p.analyses || []).filter((a) => a.status === 'approved' && a.v === p.analysisApprovedV).map((a) => 'Approved visual structure analysis:\n' + (a.text || '').slice(0, 1500))),
+    'Neutral background, clear front or three-quarter angle, no extra invented parts.',
+    'Do not use customer review screenshots as product shape references.'
+  ].join('\n');
+  const promptText = h('textarea', { rows: 9, 'data-reference-prompt': '', 'aria-label': '이미지 생성 프롬프트 직접 수정', placeholder: 'AI 분석 후 제품 이미지 생성 프롬프트를 수정하세요.' }, p.referencePrompt || defaultPrompt);
+  const promptSave = async () => {
+    try { await api.put('/api/products/' + p.id, { referencePrompt: promptText.value }); toast('이미지 생성 프롬프트를 저장했습니다.'); }
+    catch (e) { toast(e.message, { error: true }); }
+  };
+  const imageSection = h('div', { class: 'stack', style: 'gap:12px' },
+    h('div', { class: 'row between', style: 'flex-wrap:wrap' }, h('h3', null, '제품 스크린샷'), chip(productCount + '장 · 제품/리뷰 합계 ' + totalCount + '/10')),
+    h('p', { class: 'small muted', style: 'margin:0' }, '제품 사진은 3~5장 권장. 이미지 선택, 끌어놓기, Cmd+V 붙여넣기가 가능합니다. 저장 후 원본을 확인해 주세요.'),
+    B);
+  const reviewSection = h('div', { class: 'stack', style: 'gap:10px' },
+    h('h3', null, '리뷰 캡처 · 텍스트'),
+    h('p', { class: 'small muted', style: 'margin:0' }, '제품과 리뷰 이미지를 합쳐 최대 10장. 리뷰 자료는 참조 이미지 생성에 사용하지 않고 사용자 의견 분석에만 사용합니다.'),
+    reviewBlock);
+  const promptSection = h('div', { class: 'card stack', style: 'gap:12px', 'data-product-reference-prompt': '' },
+    h('h2', null, '이미지 생성 프롬프트 · 직접 수정'),
+    h('p', { class: 'small muted' }, '제품 분석을 확인한 다음 아래 문장을 원하는 대로 편집하세요. 제품의 실제 로고·형태·버튼은 업로드한 사진과 일치해야 합니다.'),
+    promptText,
+    h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' },
+      h('button', { class: 'btn ghost', onclick: promptSave }, '프롬프트 저장'),
+      h('button', { class: 'btn clay', disabled: !approvedOrig.length, onclick: async () => {
+        await promptSave();
+        genDialog(p, approvedOrig, null, promptText.value);
+      } }, '이 프롬프트로 참조 이미지 생성…')));
+  const analysisSection = h('div', { class: 'stack', style: 'gap:14px' },
+    h('div', { class: 'card stack', style: 'gap:12px' },
+      h('h2', null, 'AI 제품 분석'),
+      h('p', { class: 'small muted' }, '제품 사진의 형태·기능·표기 문구는 시각 분석으로, 리뷰의 장단점은 별도의 리뷰 분석으로 정리합니다. AI 실행 전 각각 예상 비용을 확인합니다.'),
+      analysisPanel(p)),
+    rr.analysis ? h('div', { class: 'small muted' }, rr.approved ? '리뷰 분석 승인됨 · 스토리 랩에 반영됩니다.' : '리뷰 분석 초안 · 먼저 승인해 주세요.') : null,
+    promptSection);
+  const intake = h('section', { class: 'card stack', style: 'gap:20px', 'data-unified-product-intake': '' },
+    h('div', { class: 'stack', style: 'gap:6px' }, h('h2', null, '1 · 제품 자료 모으기'), h('p', { class: 'small muted' }, '쿠팡 제휴 링크·상품번호로 등록한 제품에 스크린샷과 리뷰를 한 화면에서 추가하세요.')),
+    fold('제품 링크 · 상품명 · 스펙 · 복붙 메모', '추출 정보 확인 및 수정', !p.name || !p.specs.some((s) => s.verified), A),
+    imageSection, reviewSection);
+  const results = h('section', { class: 'stack', style: 'gap:14px', 'data-product-analysis-results': '' },
+    h('h2', null, '2 · AI 분석 결과와 프롬프트'), analysisSection,
+    fold('참조 이미지 버전 기록 · 고급', '필요할 때만 열기', false, B2),
+    fold('참조 이미지 승인 · 고급', p.reference.state === 'approved' ? '승인됨' : '확인 필요', false, C));
+  wrap.replaceChildren(head, summary, intake, results);
   return wrap;
 }
 
@@ -311,11 +367,11 @@ function compare(p, im) {
     h('div', { class: 'row end' }, h('button', { class: 'btn', onclick: close }, '닫기')), ), { wide: true });
 }
 
-async function genDialog(p, originals, prev = null) {
+async function genDialog(p, originals, prev = null, initialPrompt = '') {
   const sel = new Set(prev ? (prev.basedOn || []).filter((i) => originals.some((o) => o.id === i)) : originals.slice(0, 2).map((i) => i.id));
   const extra = new Set(prev ? prev.extraRefs || [] : []);
   const pool = p.images.filter((i) => i.kind !== 'ai_generated' && !['rejected', 'replaced'].includes(i.status) && !originals.some((o) => o.id === i.id && sel.has(o.id)));
-  let prompt = prev ? prev.prompt || '' : '';
+  let prompt = initialPrompt || (prev ? prev.prompt || '' : '');
   let style = prev && prev.style ? prev.style : 'anime';
   const body = () => ({ basedOn: [...sel], extraImageIds: [...extra].filter((i) => !sel.has(i)), style, prompt });
   if (!sel.size && originals.length) sel.add(originals[0].id);
