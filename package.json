@@ -1,0 +1,27 @@
+{
+  "name": "reels-factory",
+  "version": "2.3.0",
+  "private": true,
+  "description": "Reels Factory: Sheets → Gemini scripts → approvals → FFmpeg renders",
+  "scripts": {
+    "build": "node scripts/build-bundle.js",
+    "test": "node --test tests/*.test.js",
+    "render:check": "node renderer/cli.js check",
+    "render:estimate": "node renderer/cli.js estimate",
+    "render": "node renderer/cli.js render",
+    "render:usage": "node renderer/cli.js usage",
+    "render:sample": "node renderer/sample/make-sample.js",
+    "render:pending": "node renderer/cli.js pending",
+    "render:fetch-clips": "node renderer/cli.js fetch-clips",
+    "gemini:check": "node scripts/check-gemini.js",
+    "studio": "node studio/server.js",
+    "start": "node studio/server.js",
+    "deploy:check": "node scripts/deploy-check.js",
+    "backup": "node scripts/backup-data.js",
+    "restore": "node scripts/restore-data.js",
+    "animation:preflight": "node scripts/animation-preflight.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

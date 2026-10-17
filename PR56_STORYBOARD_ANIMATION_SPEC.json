@@ -1,0 +1,69 @@
+{
+  "project": "Reels Factory Studio",
+  "version": "1.3",
+  "feature": "PR56 Storyboard Assets and Character Performance",
+  "base_branch": "feature/animation-pipeline",
+  "branch": "feature/storyboard-assets-v56",
+  "merge_policy": {
+    "do_not_merge_or_deploy_without_user_approval": true,
+    "rebase_on_main_after_pr55_merge": true
+  },
+  "scope": {
+    "broll": {
+      "thumbnail_preview": true,
+      "full_screen_preview": true,
+      "persist_existing_asset": true,
+      "clickable_badge_scroll": true,
+      "mobile_safe_scroll": true
+    },
+    "character_references": {
+      "reuse_existing_charrefs_and_broll_image_pipeline": true,
+      "show_all_approved_assets": true,
+      "scene_cast_only": true,
+      "broll_cast_independent": true,
+      "attach_real_image_bytes_when_provider_supports": true,
+      "provider_limit_aware": true,
+      "fail_closed_when_required_refs_missing": true,
+      "manual_selection": true
+    },
+    "animation": {
+      "file": "studio/lib/animdraft.js",
+      "deterministic_free": true,
+      "half_second_grid": true,
+      "persona_cues": [
+        "jack",
+        "diane"
+      ],
+      "dialogue_intent": [
+        "question",
+        "excited",
+        "negative",
+        "default"
+      ],
+      "listener_reactions": true,
+      "avoid_generic_placeholders": true,
+      "keep_existing_approved_or_manually_edited_beats": true,
+      "do_not_generate_paid_media": true
+    }
+  },
+  "safety": {
+    "server_side_script_approval_gate": true,
+    "estimate_and_explicit_confirmation_for_paid_calls": true,
+    "prevent_concurrent_duplicate_jobs": true,
+    "never_log_secrets_or_image_bytes": true,
+    "never_overwrite_approved_assets_without_confirmation": true,
+    "no_automatic_paid_retries": true
+  },
+  "acceptance_tests": [
+    "B-roll badge scrolls to visible editor on iPhone",
+    "B-roll thumbnail persists after reload without regeneration",
+    "Jack-only B-roll does not attach Diane references",
+    "Gemini receives actual reference image bytes, not only text filenames",
+    "Provider image limits respected and dropped references disclosed",
+    "Script approval and cost confirmation enforced on server",
+    "Jack and Diane dialogue produces distinctive but script-consistent gestures and listener reactions",
+    "Generated beats remain on 0.5s grid and never overlap per character",
+    "Existing manually edited and approved assets unchanged",
+    "All existing node --test tests pass"
+  ]
+}
