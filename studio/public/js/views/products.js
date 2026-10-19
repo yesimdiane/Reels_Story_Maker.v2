@@ -5,6 +5,7 @@ import { api } from '../api.js';
 import { pageHead, asyncBlock, confirmPaid } from './common.js';
 import { imageIntake, savedControls } from './image-intake.js';
 import { imagesFromTransfer } from '../image-intake-core.js';
+import { parseCoupangShare } from '../coupang-share-core.js';
 import { catalog } from './catalog.js';
 import { analysisPanel, analysisOpen } from './product-analysis.js';
 import { openBriefModal } from './product-brief.js';
@@ -58,15 +59,29 @@ function list(wrap) {
 }
 
 function newProduct() {
-  const f = { affiliateUrl: '', productNumber: '', itemNumber: '' };
+  const f = { name: '', affiliateUrl: '', productNumber: '', itemNumber: '' };
+  const inputs = {};
   let busy = false;
   const field = (label, placeholder, key, help = '') => h('div', { class: 'field' },
     h('label', null, label),
-    h('input', { type: 'text', placeholder, 'aria-label': label, oninput: (e) => (f[key] = e.target.value.trim()) }),
+    (inputs[key] = h('input', { type: 'text', placeholder, 'aria-label': label, oninput: (e) => (f[key] = e.target.value.trim()) })),
     help ? h('div', { class: 'small muted' }, help) : null);
+  // Coupang's own "공유" text ("상품명 + 링크"): split into name / link / numbers. Nothing is fetched; the operator's copied text is the source.
+  const shareNote = h('div', { class: 'small muted', 'data-share-note': '' }, '쿠팡 앱·웹의 "공유하기"로 복사한 텍스트(상품명 + 링크)를 그대로 붙여넣으면 아래 칸이 채워집니다.');
+  const sharePaste = h('textarea', { rows: 3, 'data-share-paste': '', 'aria-label': '쿠팡 공유 텍스트', placeholder: '예) 쿠쿠 스피드팟 멀티쿠커 5L\nhttps://link.coupang.com/a/...',
+    oninput: (e) => {
+      const r = parseCoupangShare(e.target.value);
+      if (!r.url) { shareNote.textContent = e.target.value.trim() ? '쿠팡 링크(coupang.com)를 찾지 못했습니다. 링크가 포함되도록 복사해 주세요.' : ''; return; }
+      f.name = r.name; f.affiliateUrl = r.url;
+      inputs.affiliateUrl.value = r.url;
+      if (r.productNumber) { f.productNumber = r.productNumber; inputs.productNumber.value = r.productNumber; }
+      if (r.itemNumber) { f.itemNumber = r.itemNumber; inputs.itemNumber.value = r.itemNumber; }
+      shareNote.textContent = (r.name ? `상품명 "${r.name}" · ` : '상품명 없음 · ') + '링크를 채웠습니다.' + (r.productNumber ? '' : ' 짧은 링크에는 상품번호가 없으니 아래 상품번호는 직접 입력하세요.');
+    } });
   modal((close) => h('div', { class: 'stack' },
     h('h2', null, 'AI 제품 등록'),
     h('p', { class: 'small muted', style: 'margin:0' }, '쿠팡 제휴 링크와 상품번호로 공개된 상품 페이지의 제품명·설명·이미지·사양을 가져와 봅니다. 차단되거나 수집할 수 없는 항목은 미확인으로 남겨 수동 보완할 수 있습니다.'),
+    h('div', { class: 'field' }, h('label', null, '쿠팡 공유 텍스트 붙여넣기 (선택)'), sharePaste, shareNote),
     field('쿠팡 파트너스 제휴 링크', 'https://link.coupang.com/a/...', 'affiliateUrl', '릴스에 사용할 제휴 링크입니다. 원본 그대로 저장됩니다.'),
     field('쿠팡 상품번호', '예: 9738720085', 'productNumber', '쿠팡상품번호의 하이픈 앞 숫자를 입력하세요.'),
     field('옵션 / 판매자번호 (선택)', '예: 29146799836', 'itemNumber', '쿠팡상품번호의 하이픈 뒤 숫자입니다.'),
@@ -89,7 +104,7 @@ function newProduct() {
         busy = true;
         e.currentTarget.disabled = true;
         let r;
-        try { r = await api.post('/api/products', { name: '', url, affiliateUrl }); }
+        try { r = await api.post('/api/products', { name: f.name, url, affiliateUrl }); }
         catch (err) { busy = false; e.currentTarget.disabled = false; toast(err.message, { error: true, recovery: err.recovery }); return; }
         if (!r || !r.id) { busy = false; e.currentTarget.disabled = false; return; }
         close();
