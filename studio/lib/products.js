@@ -47,14 +47,20 @@ function createProductService({ store, router, extractFn = extractProduct, downl
   }
   function update(id, fn) {
     const prev = queues.get(id) || Promise.resolve();
-    const run = prev.then(() => {
-      const p = get(id);
-      const out = fn(p);
-      p.updatedAt = nowIso();
-      writeJsonAtomic(fileOf(id), p);
-      return out === undefined ? p : out;
-    });
-    queues.set(id, run.catch(() => {}));
+    const run = prev
+      .then(async () => {
+        const p = get(id);
+        const out = await fn(p);
+        p.updatedAt = nowIso();
+        writeJsonAtomic(fileOf(id), p);
+        return out === undefined ? p : out;
+      })
+      .finally(() => {
+        // Drop the queue entry once this is the last pending task for the id (no unbounded Map growth).
+        if (queues.get(id) === tail) queues.delete(id);
+      });
+    const tail = run.catch(() => {});
+    queues.set(id, tail);
     return run;
   }
   const allCodes = (exceptId) => ids().filter((i) => i !== exceptId).map((i) => normCode(get(i).code)).filter(Boolean);
@@ -159,7 +165,7 @@ function createProductService({ store, router, extractFn = extractProduct, downl
   }
   function readiness(p, refs = referenceState(p)) {
     const missing = [];
-    if (!p.name) missing.push('상품명');
+    if (!p.name || !String(p.name).trim()) missing.push('상품명');
     if (!verifiedFacts(p).length) missing.push('확인된 기능/특징(최소 1개)');
     if (!refs.approved) missing.push('승인된 참조 이미지 세트');
     return { ok: missing.length === 0, missing };
@@ -505,7 +511,19 @@ function createProductService({ store, router, extractFn = extractProduct, downl
     const p = get(id);
     const r = readiness(p);
     if (!r.ok) throw new StudioError('PRODUCT_NOT_READY', '상품 준비가 끝나지 않았습니다: ' + r.missing.join(', '), { recovery: 'Products 화면에서 항목을 채우고 참조 이미지 세트를 승인하세요.', status: 409 });
-    return { product: p, facts: verifiedFacts(p), reference: referenceState(p) };
+    // Operator-approved review analysis only: comedy / daily-conflict material for Story Lab and Script Studio.
+    const approvedReview = p.reviewResearch && p.reviewResearch.approved ? (p.reviewResearch.analysis || {}) : {};
+    return {
+      product: p,
+      facts: verifiedFacts(p),
+      reference: referenceState(p),
+      creativeContext: {
+        comicSituations: approvedReview.comicSituations || [],
+        purchaseMotivations: approvedReview.purchaseMotivations || [],
+        cautions: approvedReview.cautions || [],
+        forbiddenClaims: p.forbiddenClaims || [],
+      },
+    };
   }
 
   function imageFiles(id, imageIds) {
