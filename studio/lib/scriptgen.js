@@ -13,6 +13,7 @@ const F = require('./formula');
 const SF = require('./scriptformula');
 const { sha256, uid } = require('./util');
 const T = require('./translate');
+const { behaviorLines } = require('./storylab');
 
 function createScriptGen({ store, products, storylab, episodeIds, prompts, presets, endings, router, lib, universes: getUniverses = () => null }) {
   const U = () => getUniverses();
@@ -60,7 +61,7 @@ function createScriptGen({ store, products, storylab, episodeIds, prompts, prese
     const seed = {
       id: epId, reelId: epId, productId: pid, title: concept.title, titleEn: '', series: rc.universe.name, universeId: rc.universe.id,
       cast: { universeId: rc.universe.id, characterIds: rc.ids, guest: rc.cast.guest, narrator: rc.cast.narrator, approvedExtras: extras },
-      product: { id: pid, name: p.name, kind: p.category || '', verifiedFeatures: b.facts, forbiddenClaims: p.forbiddenClaims || [], affiliateUrl: p.affiliateUrl || '', visualSummary: p.description || '', sourceNote: '운영자가 확인한 사실만 사용합니다 (Products 화면).' },
+      product: { id: pid, name: p.name, kind: p.category || '', verifiedFeatures: b.facts, verifiedBehavior: (b.visualStructure && b.visualStructure.verifiedBehavior) || [], forbiddenClaims: p.forbiddenClaims || [], affiliateUrl: p.affiliateUrl || '', visualSummary: p.description || '', sourceNote: '운영자가 확인한 사실만 사용합니다 (Products 화면).' },
       characters: rc.ids.concat(extras), beats: [],
       scenes: [], lines: [], suggestions: [],
       cta: { lines: [], durationSec: 3.5, keyword: '' },
@@ -149,6 +150,7 @@ function createScriptGen({ store, products, storylab, episodeIds, prompts, prese
       'PRODUCT_NAME: ' + ep.product.name,
       'VERIFIED_PRODUCT_FACTS (use ONLY these):',
       ...ep.product.verifiedFeatures.map((f) => '- ' + f),
+      ...(Array.isArray(ep.product.verifiedBehavior) ? behaviorLines(ep.product.verifiedBehavior) : []), // episodes made before this field existed keep their old prompt
       'FORBIDDEN_CLAIMS: ' + (ep.product.forbiddenClaims.join(', ') || 'none'),
       'CHARACTERS (speaker/characters ids must be one of these):',
       ...chars,

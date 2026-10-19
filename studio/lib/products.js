@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { StudioError, nowIso, sha256, safeName, canonical, readJson, writeJsonAtomic, writeFileAtomic } = require('./util');
 const { extractProduct, downloadImage, sniffImage, imageSize } = require('./extract');
-const { FIXED_NEGATIVES } = require('./productanalysis');
+const { FIXED_NEGATIVES, verifiedBehavior } = require('./productanalysis');
 
 const MAX_UPLOADS = 10;
 const MIN_SIDE = 100; // px — smaller images are unusable as product references
@@ -539,6 +539,8 @@ function createProductService({ store, router, extractFn = extractProduct, downl
         descriptionText: analysis ? analysis.text : '',
         sections: analysis ? analysis.sections : null,
         imagesChanged: analysisImagesChanged(p),
+        // Operator-approved, [VERIFIED] mechanisms / sensory satisfaction only. Dropped when the product images changed after the analysis (cannot be trusted any more).
+        verifiedBehavior: analysis && !analysisImagesChanged(p) ? verifiedBehavior(analysis.text) : [],
       },
       // 7. Customer pain points
       painPoints: review ? (review.cons || []).concat(review.purchaseMotivations || []) : [],

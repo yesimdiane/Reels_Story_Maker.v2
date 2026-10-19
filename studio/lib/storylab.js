@@ -27,6 +27,13 @@ function similarity(a, b) {
 
 // Appended by CODE to every story request so these rules never depend on which prompt version is stored.
 // Story Lab designs ONE coherent storyline per concept: no hook / payoff / CTA / scene-count / product-placement fields, no storyboard inputs.
+/** The product's approved, verified physical behaviour (how it opens / clicks / fits and what that looks and feels like) for the Product Bridge. */
+function behaviorLines(list) {
+  const items = (list || []).filter(Boolean);
+  if (!items.length) return ['PRODUCT_MECHANISM_DATA: none approved. Do NOT invent how the product opens, closes, clicks, snaps, fits or sounds; build the Product Bridge only on VERIFIED_PRODUCT_FACTS.'];
+  return ['PRODUCT_MECHANISM_DATA (operator-approved, verified from the product photos; the ONLY physical behaviour you may use as the trigger or the solution in the Product Bridge, never add another):', ...items.map((x) => '- ' + x)];
+}
+
 const STORY_RULES = [
   '--- STORY RULES (mandatory, in addition to the instructions above) ---',
   'Each concept is ONE polished, coherent English STORYLINE written as flowing prose (about 3-8 sentences) that tells the whole video from start to finish and makes viewers curious.',
@@ -143,6 +150,7 @@ function createStoryLab({ store, products, prompts, router, universes: getUniver
       'VERIFIED_PRODUCT_FACTS (use ONLY these):',
       ...b.facts.map((f) => '- ' + f),
       'FORBIDDEN_CLAIMS (never imply): ' + ((p.forbiddenClaims || []).join(', ') || 'none'),
+      ...behaviorLines(b.visualStructure && b.visualStructure.verifiedBehavior),
       ...(p.reviewResearch?.approved && p.reviewResearch.analysis ? [
         'CUSTOMER_REVIEW_RESEARCH (unverified individual opinions; for comedy inspiration only; NEVER as product performance facts):',
         'Review summary: ' + (p.reviewResearch.analysis.summary || ''),
@@ -430,4 +438,4 @@ function createStoryLab({ store, products, prompts, router, universes: getUniver
   return { list, castState, saveCast, allCasts, generate, regenerate, edit, approve, revoke, reject, reopen, hold, resume, remove, restore, estimate, preview, plan, storylineOf, requireApproved, peek, isApproved, FIELDS, FIELD_LABEL, similarity };
 }
 
-module.exports = { createStoryLab, FIELDS, NEW_FIELDS, STORY_RULES, similarity };
+module.exports = { createStoryLab, FIELDS, NEW_FIELDS, STORY_RULES, similarity, behaviorLines };
