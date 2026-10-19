@@ -157,12 +157,17 @@ export function rerender() {
   }
   const finish = () => { schedulePoll(); placeActionBar(); };
   shownKey = key;
-  if (!inPlace) return finish();
-  whenSettled(target, SETTLE_MS, () => {
-    if (token !== renderToken) return; // a newer render took over
-    stage.replaceChildren(...Array.from(target.childNodes));
-    restoreUi(ui);
-    finish();
+  if (!inPlace) { finish(); return Promise.resolve(); }
+  // Resolves once the new view is on screen (or a newer render took over), so `await act(...)` callers see the final DOM.
+  return new Promise((resolve) => {
+    whenSettled(target, SETTLE_MS, () => {
+      if (token === renderToken) {
+        stage.replaceChildren(...Array.from(target.childNodes));
+        restoreUi(ui);
+        finish();
+      }
+      resolve();
+    });
   });
 }
 
