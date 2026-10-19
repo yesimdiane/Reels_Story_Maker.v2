@@ -55,6 +55,26 @@ const SYSTEM = [
 
 const clean = (v, n = MAX_ITEM) => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
 
+/**
+ * The physical behaviour the operator APPROVED: "- [VERIFIED] ..." lines under the MECHANICAL MOVING PARTS and VISUAL & SENSORY SATISFACTION headings
+ * of the approved description TEXT (not the stored JSON: the operator may have edited the text before approving, and the JSON is not updated by edits).
+ * [UNCERTAIN] lines and every other section are never returned.
+ */
+function verifiedBehavior(text, { max = 12 } = {}) {
+  const titles = new Map(SECTIONS.map(([key, title]) => [title, key]));
+  const out = [];
+  let current = '';
+  for (const raw of String(text == null ? '' : text).split('\n')) {
+    const line = raw.trim();
+    if (titles.has(line)) { current = titles.get(line); continue; }
+    if (line && !line.startsWith('- ')) { current = ''; continue; } // any other heading (NOT VISIBLE…, NEGATIVE CONSTRAINTS…) ends the section
+    if (current !== 'mechanisms' && current !== 'satisfaction') continue;
+    const m = /^- \[VERIFIED\]\s*(.+)$/.exec(line);
+    if (m) out.push(clean(m[1], 300));
+  }
+  return out.filter(Boolean).slice(0, max);
+}
+
 function createProductAnalysis({ products, router, log = () => {} }) {
   const raw = (pid) => products.raw(pid);
   const live = (p) => (p.images || []).filter((i) => !i.removed && !['rejected', 'replaced'].includes(i.status));
@@ -332,4 +352,4 @@ function createProductAnalysis({ products, router, log = () => {} }) {
   return { view, estimate, generate, edit, approve, develop, developEstimate, contextFor, registerImageSet, peekSetVersion, selectImages, SYSTEM, SECTIONS, FIXED_NEGATIVES, SAMPLE_MARK, MAX_ANALYSIS_IMAGES };
 }
 
-module.exports = { createProductAnalysis, SAMPLE_MARK, FIXED_NEGATIVES };
+module.exports = { createProductAnalysis, SAMPLE_MARK, FIXED_NEGATIVES, verifiedBehavior };
