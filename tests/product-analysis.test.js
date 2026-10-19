@@ -26,7 +26,7 @@ test('analysis: free estimate first, nothing is sent or billed without confirmat
   const sent = a.analysisCalls()[0];
   assert.deepEqual(sent.images.map((i) => i.data), productFileB64(s, pid), 'the ACTUAL image bytes are what the AI receives');
   assert.match(sent.images[0].label, /Product reference photo 1 of 1/);
-  assert.match(sent.system, /Never invent dimensions/);
+  assert.match(sent.system, /Never guess unreadable text/);
   assert.equal(v.latest.v, 1); assert.equal(v.latest.status, 'draft'); assert.equal(v.latest.imageSetVersion, 1); assert.equal(v.latest.productId, pid);
   assert.equal(v.approved, null, 'a fresh analysis is a draft until the operator approves');
 });

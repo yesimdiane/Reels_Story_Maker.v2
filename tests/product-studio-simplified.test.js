@@ -120,11 +120,11 @@ test('the Product Studio screen: summary first (code, name, link, main image, re
   const src = fs.readFileSync(path.join(VIEWS, 'products.js'), 'utf8');
   for (const k of ['data-product-summary', 'data-create-story', 'data-product-card', 'data-fold']) assert.match(src, new RegExp(k), k);
   assert.match(src, /스토리 만들기/); assert.match(src, /대표 참조 이미지/); assert.match(src, /연결된 에피소드/);
-  for (const t of ['제품 정보 · 사양 · 금지 표현', '참조 이미지', 'AI 참조 이미지 생성 이력']) assert.match(src, new RegExp(t), 'folded: ' + t);
+  for (const t of ['제품 링크 · 상품명 · 스펙 · 복붙 메모', '참조 이미지', '참조 이미지 버전 기록 · 고급']) assert.match(src, new RegExp(t), 'folded: ' + t);
   const intake = fs.readFileSync(path.join(VIEWS, 'image-intake.js'), 'utf8');
   const core = fs.readFileSync(path.join(VIEWS, '..', 'image-intake-core.js'), 'utf8');
   assert.match(intake, /type: 'file', accept: ACCEPT, multiple: true/, 'a plain file input (works in mobile Safari)');
   assert.match(core, /ACCEPT = 'image\/png,image\/jpeg,image\/webp'/);
   assert.match(src, /imageIntake\(/);
-  assert.match(src, /fold\(.*false, A\)/s, 'product info starts folded');
+  assert.match(src, /fold\('제품 링크[^\n]*!p\.name \|\| !p\.specs\.some\(\(s\) => s\.verified\), A\)/, 'product info is folded unless the name or a verified spec is still missing');
 });
