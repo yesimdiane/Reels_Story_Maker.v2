@@ -6,7 +6,7 @@
 import { h, chip, icon, toast, confirmDialog, fmtSec } from '../ui.js';
 import { state, act, refresh, hooks } from '../state.js';
 import { api } from '../api.js';
-import { charAvatar } from './common.js';
+import { charAvatar, busyButton } from './common.js';
 import { attach, jumpTo } from './script-validate.js';
 import { withTranslate } from './translate-box.js';
 import { openCutEditor } from './cut-editor.js';
@@ -150,6 +150,8 @@ export function sceneFocus(ep, d, ctx, sceneId, { inline = false } = {}) {
   const ap = srv.approval;
   const idxOf = ep.scenes.findIndex((x) => x.id === sid);
   const lockedB = ep.formula.structured && sc.part === 'B' && ep.formula.ending.structureLocked;
+  // plain-language change request for "씬 다시 생성하기" (optional): e.g. make Diane's reaction more playful. Not part of the scene data, so it is never saved with it.
+  const noteIn = h('input', { type: 'text', maxlength: 1000, 'data-scene-note': sid, 'aria-label': '이 씬 변경 요청 (선택)', placeholder: '고치고 싶은 내용 (선택) — 예: 다이앤의 표정을 더 장난스럽게', style: 'flex:1;min-width:220px' });
   if (ap && ap.approved && collapsedNow(ep.id, sid) && !d.dirtyScenes.has(sid) && !(ep.sceneRegen || {})[sid]) return compactScene(ep, d, sid, sc, ap, ctx, canMove(ep, sid), lockedB);
   const errCount = (fields) => (index.errors || []).filter((e) => (e.sceneId === sid || (e.lineId && d.lines.some((l) => l.id === e.lineId && l.sceneId === sid))) && fields.includes(SECTION_OF[e.field] || '')).length;
 
@@ -252,7 +254,12 @@ export function sceneFocus(ep, d, ctx, sceneId, { inline = false } = {}) {
     field('시각 연출 (필수, English)', 'visual', 5), field('제품 배치 (선택)', 'placement', 2),
     h('label', { class: 'row small', style: 'gap:6px' }, h('input', { type: 'checkbox', 'data-rf': `S:${sid}:showsProduct`, checked: !!sc.showsProduct, onchange: (e) => { sc.showsProduct = e.target.checked; dirty(); } }), '이 장면에 제품이 보임'),
     lockedB ? null : h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap;align-items:center' },
-      h('button', { class: 'btn sm clay', type: 'button', 'data-scene-regenerate': sid, title: '위 시각 연출을 기준으로 이 씬 하나만 다시 만듭니다 (유료 텍스트 호출 · 비용 확인 후 · 검토 전에는 적용되지 않음)', onclick: () => startRegeneration(ep, sc) }, '씬 다시 생성하기'),
+      noteIn,
+      h('button', { class: 'btn sm clay', type: 'button', 'data-scene-regenerate': sid, title: '위 시각 연출(과 변경 요청)을 기준으로 이 씬 하나만 다시 만듭니다 (유료 텍스트 호출 · 비용 확인 후 · 검토 전에는 적용되지 않음)', onclick: async (ev) => {
+        const busy = busyButton(ev.currentTarget);
+        if (!busy.begin('비용 계산 중…')) return;
+        try { await startRegeneration(ep, sc, noteIn.value.trim(), busy); } finally { busy.end(); }
+      } }, '🪄 씬 다시 생성하기'),
       h('span', { class: 'small muted' }, '이 씬만 · 검토 후 적용')));
   bcutTab.append(bcutPlanner(ep, srv));
   drawRoles();
