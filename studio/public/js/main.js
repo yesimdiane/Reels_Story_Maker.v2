@@ -120,7 +120,8 @@ function modePill() {
 const SETTLE_MS = 1200;
 let shownKey = '';
 let renderToken = 0;
-const viewKey = () => [state.view, state.episodeId || '', state.productId || ''].join('|');
+// The whole address counts (settings tabs and sub-pages share state.view): a different address is a navigation, the same address is a refresh of what is on screen.
+const viewKey = () => [location.hash, state.view, state.episodeId || '', state.productId || ''].join('|');
 
 function captureUi() {
   return { y: window.scrollY, folds: Array.from(document.querySelectorAll('#stage details[data-fold]')).filter((d) => d.open).map((d) => d.dataset.fold) };
