@@ -29,8 +29,10 @@ export function script() {
   const sid = currentSceneId(ep);
 
   // ---- episode-level fields (title, story beats, CTA, ending values) are saved separately from scenes ----
-  const dirtyEp = () => { d.epDirty = true; epSave.disabled = false; epSave.textContent = '에피소드 설정 저장'; };
+  const dirtyEp = () => { d.epDirty = true; for (const b of [epSave, ctaSave]) { b.disabled = false; b.textContent = '에피소드 설정 저장'; } };
   const epSave = h('button', { class: 'btn sm', type: 'button', disabled: !d.epDirty, onclick: () => saveEpisode() }, d.epDirty ? '에피소드 설정 저장' : '저장됨');
+  // the CTA box lives outside the folded episode tools, so it carries its own save button (same action)
+  const ctaSave = h('button', { class: 'btn sm', type: 'button', 'data-cta-save': '', disabled: !d.epDirty, onclick: () => saveEpisode() }, d.epDirty ? '에피소드 설정 저장' : '저장됨');
   async function saveEpisode() {
     try {
       const patch = { title: d.title, titleEn: d.titleEn, beats: d.beats, cta: d.cta, ...(d.comedy_story ? { comedy_story: d.comedy_story, product_ending: d.product_ending, ending: { vars: d.endingVars } } : {}) };
@@ -69,8 +71,6 @@ export function script() {
   wrap.append(projectPanel(ep, d, errorSummary(ep, index, { onJump })));
   if (ep.derived.scriptChangedSinceApproval) wrap.append(h('div', { class: 'banner warn' }, h('div', null, h('b', null, '승인 후 대본이 수정되었습니다'), '유료 생성·음성·렌더가 잠겼습니다. 바뀐 씬을 다시 확인하고 승인하세요.')));
   wrap.append(sceneNavigator(ep, d, ctx, { list: wide }));
-  if (wide) wrap.append(h('div', { class: 'stack scene-list', style: 'gap:16px' }, cards.map((c) => c.el)));
-  else wrap.append(focus.el);
 
   // ---- episode tools (collapsed): everything that is not about the current scene ----
   const presetBox = ep.derived.concept.linked ? presetPanel(ep) : null;
@@ -86,16 +86,32 @@ export function script() {
       h('div', { class: 'field' }, h('label', null, '제목 (한국어)'), h('input', { type: 'text', value: d.title, oninput: (e) => { d.title = e.target.value; dirtyEp(); } })),
       h('div', { class: 'field' }, h('label', null, 'Title (English)'), h('input', { type: 'text', value: d.titleEn, oninput: (e) => { d.titleEn = e.target.value; dirtyEp(); } }))),
     h('div', { class: 'field' }, h('label', null, '스토리 비트 (한 줄에 하나)'), h('textarea', { rows: 4, oninput: (e) => { d.beats = e.target.value.split('\n').filter((x) => x.trim()); dirtyEp(); } }, d.beats.join('\n'))));
-  const ctaCard = h('div', { class: 'card' }, h('div', { class: 'card-head' }, h('h3', null, '엔드 카드 · CTA'), chip('한국어', '')),
-    attach(index, h('div', { class: 'field' }, h('label', null, 'CTA 문구 (한 줄에 하나 — 영상 마지막에 표시)'), h('textarea', { rows: 4, lang: 'ko', oninput: (e) => { d.cta.lines = e.target.value.split('\n').filter((x) => x.trim()); dirtyEp(); } }, d.cta.lines.join('\n'))), 'cta:lines'),
-    h('div', { class: 'grid two', style: 'margin-top:12px' }, attach(index, h('div', { class: 'field' }, h('label', null, 'ManyChat 댓글 키워드 (공개)'), h('input', { type: 'text', value: d.cta.keyword, oninput: (e) => { d.cta.keyword = e.target.value; dirtyEp(); } })), 'cta:keyword'), attach(index, h('div', { class: 'field' }, h('label', null, '엔드 카드 길이 (초)'), h('input', { type: 'number', min: 0, max: 8, step: 0.5, value: d.cta.durationSec, oninput: (e) => { d.cta.durationSec = Number(e.target.value); dirtyEp(); } })), 'cta:durationSec')),
-    h('p', { class: 'small muted', style: 'margin:10px 0 0' }, '이모지(☂️ 등)는 캡션에는 남지만 영상 자막으로는 그려지지 않습니다. 내부 상품 ID는 공개 키워드로 쓸 수 없습니다.'));
+  // End card / CTA: the ManyChat keyword (required by the server: KEYWORD / CTA_KEYWORD / KEYWORD_MISMATCH) is always visible under the last story beat;
+  // the CTA lines and card length are folded and open by themselves when they carry a validation error.
+  const ctaHasError = ['cta:lines', 'cta:durationSec'].some((k) => (index.byKey[k] || []).length);
+  const ctaBox = h('div', { class: 'card stack', style: 'gap:10px', 'data-cta-box': '' },
+    h('div', { class: 'card-head' }, h('h3', null, '엔드 카드 · CTA'), chip('한국어', '')),
+    attach(index, h('div', { class: 'field' }, h('label', null, 'ManyChat 댓글 키워드 (공개)'), h('input', { type: 'text', value: d.cta.keyword, 'data-cta-keyword': '', oninput: (e) => { d.cta.keyword = e.target.value; dirtyEp(); } })), 'cta:keyword'),
+    h('details', { 'data-cta-details': '', open: ctaHasError },
+      h('summary', null, 'CTA 문구 · 엔드 카드 길이'),
+      h('div', { class: 'stack', style: 'gap:12px;margin-top:10px' },
+        attach(index, h('div', { class: 'field' }, h('label', null, 'CTA 문구 (한 줄에 하나 — 영상 마지막에 표시)'), h('textarea', { rows: 4, lang: 'ko', oninput: (e) => { d.cta.lines = e.target.value.split('\n').filter((x) => x.trim()); dirtyEp(); } }, d.cta.lines.join('\n'))), 'cta:lines'),
+        attach(index, h('div', { class: 'field' }, h('label', null, '엔드 카드 길이 (초)'), h('input', { type: 'number', min: 0, max: 8, step: 0.5, value: d.cta.durationSec, oninput: (e) => { d.cta.durationSec = Number(e.target.value); dirtyEp(); } })), 'cta:durationSec'),
+        h('p', { class: 'small muted', style: 'margin:0' }, 'CTA 문구에는 위 키워드가 들어 있어야 합니다. 이모지(☂️ 등)는 캡션에는 남지만 영상 자막으로는 그려지지 않습니다. 내부 상품 ID는 공개 키워드로 쓸 수 없습니다.'))),
+    h('div', { class: 'row' }, ctaSave, d.epDirty ? h('span', { class: 'small', style: 'color:var(--clay)' }, '저장하지 않은 에피소드 설정이 있습니다') : null));
+  if (wide) {
+    // the CTA box sits right after the card of the last story beat (product bridge); the fixed ending scenes follow it
+    const els = cards.map((c) => c.el);
+    const lastBeat = ep.scenes.reduce((at, x, k) => (x.beatKey === 'product_bridge' && x.part !== 'B' ? k : at), -1);
+    els.splice((lastBeat >= 0 ? lastBeat : els.length - 1) + 1, 0, ctaBox);
+    wrap.append(h('div', { class: 'stack scene-list', style: 'gap:16px' }, els));
+  }
+  else { wrap.append(focus.el); wrap.append(ctaBox); }
   const tools = h('details', { class: 'card episode-tools', 'data-episode-tools': '1', open: !!(state.ui && state.ui.toolsOpen) },
-    h('summary', null, h('b', null, '에피소드 도구'), h('span', { class: 'small muted' }, ' 스토리 컨셉 · 프롬프트 · 대사 시간 · 구조도 · 제목 · CTA · 엔딩')),
+    h('summary', null, h('b', null, '에피소드 도구'), h('span', { class: 'small muted' }, ' 스토리 컨셉 · 프롬프트 · 대사 시간 · 구조도 · 제목 · 엔딩')),
     h('div', { class: 'stack', style: 'gap:14px;margin-top:12px' },
       panelRow, structureMap(ep, { dirty: () => d.dirty || d.epDirty }), episodeCard,
       ep.formula.structured ? formulaLayout({ ep, d, blocks: [], dirty: dirtyEp, redrawAll: () => hooks.rerender(), v, index, addSceneIn: addSceneHere, focusScene }) : null,
-      ctaCard,
       h('div', { class: 'row' }, epSave, d.epDirty ? h('span', { class: 'small', style: 'color:var(--clay)' }, '저장하지 않은 에피소드 설정이 있습니다') : null)));
   tools.addEventListener('toggle', () => { state.ui = state.ui || { open: {} }; state.ui.toolsOpen = tools.open; });
   wrap.append(tools);
