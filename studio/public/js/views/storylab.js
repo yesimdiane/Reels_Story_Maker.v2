@@ -212,11 +212,41 @@ async function deleteStory(c, pid, run, used) {
 
 function editModal(c, pid, cats) {
   const f = { title: c.title, storyline: c.storyline, maxDurationSec: c.maxDurationSec || 45, category: c.category || '' };
+  const titleIn = h('input', { type: 'text', value: f.title, 'data-edit-title': '', oninput: (e) => (f.title = e.target.value) });
+  const storyIn = h('textarea', { rows: 8, 'data-edit-storyline': '', oninput: (e) => (f.storyline = e.target.value) }, f.storyline);
+  // AI refine: rewrites THIS story from a short instruction and only fills the fields above; nothing is saved until 저장 (which goes through the normal edit).
+  const instr = h('textarea', { rows: 2, maxlength: 1000, 'data-refine-instruction': '', 'aria-label': 'AI 수정 지시문', placeholder: '고치고 싶은 내용을 적어 주세요. 예) 대결 장면을 바꿔줘. 각자 자기 배수구를 청소하고…' });
+  const refineBtn = h('button', { class: 'btn clay', type: 'button', 'data-refine-run': '', onclick: async (ev) => {
+    const instruction = instr.value.trim();
+    if (!instruction) return toast('고치고 싶은 내용을 입력하세요', { error: true });
+    const busy = busyButton(ev.currentTarget);
+    if (!busy.begin('비용 계산 중…')) return;
+    try {
+      const body = { instruction, title: f.title, storyline: f.storyline };
+      let est;
+      try { est = await api.post(`/api/storylab/${pid}/concepts/${c.id}/refine/estimate`, body); } catch (e) { return toast(e.message, { error: true, recovery: e.recovery }); }
+      busy.label('비용 확인 중…');
+      const conf = await confirmPaid({ title: 'AI로 스토리 다시 쓰기', est, confirmLabel: '다시 쓰기',
+        body: h('div', { class: 'stack small', style: 'gap:6px' }, h('div', null, '지금 입력창에 있는 스토리를 지시문대로 고쳐 다시 씁니다. 결과는 입력창에만 채워지고, 저장을 눌러야 반영됩니다.'), h('div', { class: 'muted' }, '지시문: ' + instruction)) });
+      if (conf === null) return;
+      busy.label('AI 반영 중…');
+      let r;
+      try { r = await api.post(`/api/storylab/${pid}/concepts/${c.id}/refine`, Object.assign({}, body, { confirm: conf })); } catch (e) { return toast(e.message, { error: true, recovery: e.recovery }); }
+      titleIn.value = f.title = r.title; storyIn.value = f.storyline = r.storyline;
+      instr.value = '';
+      toast(r.changed ? 'AI 수정안을 입력창에 넣었습니다. 확인하고 필요하면 고친 뒤 저장하세요.' : 'AI가 거의 같은 내용을 돌려줬습니다. 지시문을 더 구체적으로 적어 보세요.');
+    } finally { busy.end(); }
+  } }, '🪄 AI로 다시 생성하기');
   modal((close) => h('div', { class: 'stack' }, h('h2', null, '스토리 수정'),
     c.approved ? h('div', { class: 'banner warn' }, '승인된 스토리를 수정하면 새 버전(Story v' + (c.revision + 1) + ')이 되고 재승인이 필요합니다. 이전에 승인된 버전과 이미 만든 에피소드는 바뀌지 않습니다.') : null,
-    h('div', { class: 'field' }, h('label', null, '제목 (English)'), h('input', { type: 'text', value: f.title, oninput: (e) => (f.title = e.target.value) })),
-    h('div', { class: 'field' }, h('label', null, '스토리라인 (English)'), h('textarea', { rows: 8, oninput: (e) => (f.storyline = e.target.value) }, f.storyline)),
+    h('div', { class: 'field' }, h('label', null, '제목 (English)'), titleIn),
+    h('div', { class: 'field' }, h('label', null, '스토리라인 (English)'), storyIn),
     c.ko && c.ko.storyline ? h('div', { class: 'small muted' }, '한국어 번역은 읽기 전용이며, 영문을 고치면 "오래됨"으로 표시됩니다.') : null,
+    h('div', { class: 'card flat stack', style: 'gap:8px', 'data-refine-box': '' },
+      h('div', { class: 'small', style: 'font-weight:600' }, '🪄 AI 부분 수정'),
+      instr,
+      h('div', { class: 'row end' }, refineBtn),
+      h('div', { class: 'small muted' }, '유료 AI 호출입니다(비용 확인 후 실행). 확인된 제품 사실과 금지 표현 규칙은 그대로 적용됩니다.')),
     h('div', { class: 'row' },
       h('label', { class: 'row small', style: 'gap:6px' }, '카테고리', h('select', { onchange: (e) => (f.category = e.target.value) }, cats.filter((o) => !o.fixedCount).map((o) => h('option', { value: o.key, selected: o.key === f.category }, o.ko)))),
       h('label', { class: 'row small', style: 'gap:6px' }, '최대 길이', h('input', { type: 'number', inputmode: 'numeric', min: 10, max: 90, value: f.maxDurationSec, style: 'width:84px', oninput: (e) => (f.maxDurationSec = e.target.value) }), '초')),

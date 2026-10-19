@@ -20,8 +20,8 @@ const GOOD = {
 };
 
 /** Fake AI: answers the vision analysis, concepts and scripts; image generation returns a different image every call. */
-function ai({ analysis = () => GOOD, imageBytes = null, develop = null, concepts = null } = {}) {
-  const base = fakeAi({ '*': (req) => (develop && /creative director/.test(req.system || '') ? { text: develop(req), json: null, usage: { inputTokens: 900, outputTokens: 400 } } : /product research analyst/.test(req.system || '') ? { text: '', json: analysis(req), usage: { inputTokens: 900, outputTokens: 400 } } : { text: '', json: isScriptPrompt(req) ? scriptResponse(req) : concepts ? concepts(req) : goodConcepts(3), usage: { inputTokens: 1000, outputTokens: 500 } }) });
+function ai({ analysis = () => GOOD, imageBytes = null, develop = null, concepts = null, refine = null } = {}) {
+  const base = fakeAi({ '*': (req) => (refine && /sitcom script doctor/.test(req.prompt || '') ? { text: '', json: refine(req), usage: { inputTokens: 900, outputTokens: 300 } } : develop && /creative director/.test(req.system || '') ? { text: develop(req), json: null, usage: { inputTokens: 900, outputTokens: 400 } } : /product research analyst/.test(req.system || '') ? { text: '', json: analysis(req), usage: { inputTokens: 900, outputTokens: 400 } } : { text: '', json: isScriptPrompt(req) ? scriptResponse(req) : concepts ? concepts(req) : goodConcepts(3), usage: { inputTokens: 1000, outputTokens: 500 } }) });
   let n = 300;
   const factory = (name) => {
     const p = base.factory(name);
@@ -29,7 +29,7 @@ function ai({ analysis = () => GOOD, imageBytes = null, develop = null, concepts
     p.generateImage = async (req) => { await orig(req); n += 1; return { images: [{ mimeType: 'image/png', data: (imageBytes ? imageBytes(n) : png(n)).toString('base64') }], usage: { inputTokens: 10, outputTokens: 10 } }; };
     return p;
   };
-  return { factory, calls: base.calls, imageCalls: () => base.calls.filter((c) => c.image), analysisCalls: () => base.calls.filter((c) => !c.image && /product research analyst/.test(c.system || '')), developCalls: () => base.calls.filter((c) => /creative director/.test(c.system || '')) };
+  return { factory, calls: base.calls, imageCalls: () => base.calls.filter((c) => c.image), analysisCalls: () => base.calls.filter((c) => !c.image && /product research analyst/.test(c.system || '')), developCalls: () => base.calls.filter((c) => /creative director/.test(c.system || '')), refineCalls: () => base.calls.filter((c) => /sitcom script doctor/.test(c.prompt || '')) };
 }
 const visionRoute = (s) => routePaid(s, 'gemini', ['productUnderstanding']);
 function imageRoute(s) { s.integrations.setKey('gemini', 'gem-key-123456789'); s.integrations.setRouting('imageGeneration', { provider: 'gemini', model: 'model-a' }); }
