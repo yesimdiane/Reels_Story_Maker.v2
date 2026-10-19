@@ -45,12 +45,21 @@ function parseUrl(raw) {
 }
 
 /** Real fetcher. The DNS lookup is performed by the socket itself and validated, so a rebinding attacker cannot swap the address. */
-function createFetcher({ lookup = dns.lookup } = {}) {
-  const safeLookup = (host, opts, cb) => lookup(host, { all: false, family: opts && opts.family }, (err, address, family) => {
+function createSafeLookup(lookup = dns.lookup) {
+  // Sockets call lookup with { all: true } on Node >= 20 (autoSelectFamily) and expect an ARRAY; older callers expect one address.
+  // Resolve every address, refuse the host if ANY of them is internal, and answer in the shape that was asked for.
+  return (host, opts, cb) => lookup(host, { all: true, family: opts && opts.family }, (err, found) => {
     if (err) return cb(err);
-    if (isPrivateIp(address)) return cb(Object.assign(new Error('내부 네트워크 주소는 가져올 수 없습니다.'), { code: 'BLOCKED_HOST' }));
-    cb(null, address, family);
+    const list = (Array.isArray(found) ? found : [{ address: found, family: net.isIPv6(found) ? 6 : 4 }]).filter((a) => a && a.address);
+    if (!list.length) return cb(Object.assign(new Error('호스트의 IP 주소를 확인할 수 없습니다.'), { code: 'ENOTFOUND' }));
+    if (list.some((a) => isPrivateIp(a.address))) return cb(Object.assign(new Error('내부 네트워크 주소는 가져올 수 없습니다.'), { code: 'BLOCKED_HOST' }));
+    if (opts && opts.all) return cb(null, list);
+    return cb(null, list[0].address, list[0].family);
   });
+}
+
+function createFetcher({ lookup = dns.lookup } = {}) {
+  const safeLookup = createSafeLookup(lookup);
   return function get(rawUrl, { maxBytes = MAX_HTML, accept = 'text/html,*/*;q=0.5', redirects = 3 } = {}) {
     return new Promise((resolve, reject) => {
       let u;
@@ -250,4 +259,4 @@ function imageSize(buf) {
   return null;
 }
 
-module.exports = { imageSize, extractProduct, downloadImage, createFetcher, parseProductHtml, parseRobots, robotsAllows, detectBlock, isPrivateIp, parseUrl, sniffImage, UA };
+module.exports = { imageSize, extractProduct, downloadImage, createFetcher, createSafeLookup, parseProductHtml, parseRobots, robotsAllows, detectBlock, isPrivateIp, parseUrl, sniffImage, UA };
