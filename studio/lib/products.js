@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { StudioError, nowIso, sha256, safeName, canonical, readJson, writeJsonAtomic, writeFileAtomic } = require('./util');
 const { extractProduct, downloadImage, sniffImage, imageSize } = require('./extract');
+const { FIXED_NEGATIVES } = require('./productanalysis');
 
 const MAX_UPLOADS = 10;
 const MIN_SIDE = 100; // px — smaller images are unusable as product references
@@ -511,18 +512,42 @@ function createProductService({ store, router, extractFn = extractProduct, downl
     const p = get(id);
     const r = readiness(p);
     if (!r.ok) throw new StudioError('PRODUCT_NOT_READY', '상품 준비가 끝나지 않았습니다: ' + r.missing.join(', '), { recovery: 'Products 화면에서 항목을 채우고 참조 이미지 세트를 승인하세요.', status: 409 });
-    // Operator-approved review analysis only: comedy / daily-conflict material for Story Lab and Script Studio.
-    const approvedReview = p.reviewResearch && p.reviewResearch.approved ? (p.reviewResearch.analysis || {}) : {};
+    // Only operator-approved material reaches Story Lab / Script Studio / Storyboard.
+    const review = p.reviewResearch && p.reviewResearch.approved ? (p.reviewResearch.analysis || {}) : null;
+    const analysis = (p.analyses || []).find((a) => a.v === p.analysisApprovedV && a.status === 'approved') || null;
+    const reference = referenceState(p);
+    const facts = verifiedFacts(p);
+    const forbiddenClaims = p.forbiddenClaims || [];
     return {
+      // Legacy keys (scriptgen / storylab / studio read these).
       product: p,
-      facts: verifiedFacts(p),
-      reference: referenceState(p),
+      facts,
+      reference,
       creativeContext: {
-        comicSituations: approvedReview.comicSituations || [],
-        purchaseMotivations: approvedReview.purchaseMotivations || [],
-        cautions: approvedReview.cautions || [],
-        forbiddenClaims: p.forbiddenClaims || [],
+        comicSituations: review ? review.comicSituations || [] : [],
+        purchaseMotivations: review ? review.purchaseMotivations || [] : [],
+        cautions: review ? review.cautions || [] : [],
+        forbiddenClaims,
       },
+      // 1. Product identity
+      identity: { productId: p.id, code: p.code || '', name: p.name, category: p.category || '', brand: p.brand || '', price: p.price || null },
+      // 2. Verified facts
+      verifiedFacts: facts,
+      // 3-6. Visual lock, mechanism, hand scale, satisfaction (approved structure description)
+      visualStructure: {
+        version: analysis ? analysis.v : null,
+        descriptionText: analysis ? analysis.text : '',
+        sections: analysis ? analysis.sections : null,
+        imagesChanged: analysisImagesChanged(p),
+      },
+      // 7. Customer pain points
+      painPoints: review ? (review.cons || []).concat(review.purchaseMotivations || []) : [],
+      // 8. Comedy opportunities
+      comedyOpportunities: review ? review.comicSituations || [] : [],
+      // 9. Forbidden claims and visual negatives
+      forbidden: { claims: forbiddenClaims, visualNegatives: FIXED_NEGATIVES.slice() },
+      // 10. Approved references
+      references: reference,
     };
   }
 
