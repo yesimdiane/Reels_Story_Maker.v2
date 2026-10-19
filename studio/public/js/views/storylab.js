@@ -3,7 +3,7 @@
 import { h, chip, icon, toast, modal, confirmDialog } from '../ui.js';
 import { state, act, setProduct } from '../state.js';
 import { api } from '../api.js';
-import { pageHead, asyncBlock, confirmPaid } from './common.js';
+import { pageHead, asyncBlock, confirmPaid, busyButton } from './common.js';
 import { castSection } from './cast-picker.js';
 import { catalog } from './catalog.js';
 
@@ -92,9 +92,14 @@ function body(lab, prod) {
     h('details', { class: 'small', 'data-advanced': '' }, h('summary', { style: 'cursor:pointer;min-height:36px;display:flex;align-items:center' }, '고급 설정'),
       h('div', { class: 'field', style: 'margin-top:6px' }, h('input', { type: 'text', 'aria-label': '추가 지시', placeholder: '추가 지시 (선택) — 예: 비 오는 날 상황 위주로', value: view.extra, oninput: (e) => (view.extra = e.target.value) }))),
     h('div', { class: 'small', 'data-gen-summary': '' }, genSummary()),
-    h('div', { class: 'row' }, h('button', { class: 'btn', disabled: !ready.ok || !view.category || !!(lab.cast.errors && lab.cast.errors.length), onclick: generate }, icon('plus'), '스토리 컨셉 생성'))));
+    h('div', { class: 'row' }, h('button', { class: 'btn', disabled: !ready.ok || !view.category || !!(lab.cast.errors && lab.cast.errors.length), onclick: (ev) => generate(ev.currentTarget) }, icon('plus'), '스토리 컨셉 생성'))));
 
-  async function generate() {
+  async function generate(btn) {
+    const busy = btn ? busyButton(btn) : null;
+    if (busy && !busy.begin('비용 계산 중…')) return; // already running: a second click must not open a second confirmation
+    try { await generateStories(busy); } finally { if (busy) busy.end(); }
+  }
+  async function generateStories(busy) {
     if (!view.category) return toast('카테고리를 선택하세요', { error: true });
     const sec = Number(view.maxSec);
     if (!Number.isInteger(sec) || sec < 10 || sec > 90) return toast('영상 최대 길이는 10~90초의 정수로 입력하세요', { error: true });
@@ -102,6 +107,7 @@ function body(lab, prod) {
     const req = { category: view.category, count: effCount(), maxDurationSec: sec, extra: view.extra, cast: lab.cast.cast };
     let est, preview;
     try { [est, preview] = await Promise.all([api.post(`/api/storylab/${pid}/estimate`, req), api.post(`/api/storylab/${pid}/preview`, req)]); } catch (e) { return toast(e.message, { error: true, recovery: e.recovery }); }
+    if (busy) busy.label('비용 확인 중…');
     const c = await confirmPaid({ title: `스토리 ${est.count}개 생성`, est, confirmLabel: '생성', body: h('div', { class: 'stack', style: 'gap:8px' },
       h('div', { class: 'card flat stack', style: 'gap:4px', 'data-confirm-summary': '' }, h('div', { class: 'small muted' }, '만들 내용'), h('b', null, est.summary), h('div', { class: 'small' }, `총 ${est.count}개 · 최대 ${est.maxDurationSec}초 · 영어 스토리라인과 한국어 번역을 한 번에 생성`), view.extra ? h('div', { class: 'small muted' }, '추가 지시: ' + view.extra) : null),
       h('details', { 'data-story-prompt-preview': '' },
@@ -116,6 +122,7 @@ function body(lab, prod) {
           h('p', { class: 'small muted' }, '실제 생성 결과는 생성 후 아래 스토리 카드에 표시됩니다. 첨부 이미지는 파일 내용 대신 참조 ID와 개수만 표시합니다.'))),
       h('p', { class: 'small muted', style: 'margin:0' }, '장면·대사·이미지 프롬프트는 만들지 않습니다. 기존 스토리와 승인된 버전은 바뀌지 않고 새 스토리만 추가됩니다.')) });
     if (c === null) return;
+    if (busy) busy.label('스토리 생성 중… (수 초~수십 초)');
     await act(async () => { await api.post(`/api/storylab/${pid}/generate`, Object.assign({}, req, { confirm: c })); return null; }, { ok: '스토리를 만들었습니다' });
   }
 

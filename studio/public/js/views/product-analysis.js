@@ -4,7 +4,7 @@
 import { h, chip, toast } from '../ui.js';
 import { state, act } from '../state.js';
 import { api } from '../api.js';
-import { asyncBlock, confirmPaid } from './common.js';
+import { asyncBlock, confirmPaid, busyButton } from './common.js';
 
 const STATUS = { approved: ['승인됨', 'done'], draft: ['검토 대기 (초안)', 'attention'], superseded: ['이전 버전', 'mock'] };
 
@@ -43,16 +43,22 @@ function draw(p, a, ui, rerender) {
       h('img', { src: im.url, alt: im.label || '제품 이미지' }),
       h('figcaption', null, h('span', { class: 'row small', style: 'gap:6px' }, h('input', { type: 'checkbox', 'data-analysis-pick': im.id, checked: picked.has(im.id), onchange: (e) => { if (e.target.checked) { if (picked.size >= a.limits.maxImages) { e.target.checked = false; return toast(`분석에는 최대 ${a.limits.maxImages}장까지 쓸 수 있습니다`, { error: true }); } picked.add(im.id); } else picked.delete(im.id); ui.ids = [...picked]; } }), im.label || im.id))))) : h('div', { class: 'small muted' }, '분석할 제품 사진이 없습니다. 위 "참조 이미지"에서 사진을 올리거나 붙여넣으세요.')));
 
-  const analyze = h('button', { class: 'btn clay', type: 'button', 'data-analysis-run': p.id, disabled: !live.length, onclick: async () => {
+  const analyze = h('button', { class: 'btn clay', type: 'button', 'data-analysis-run': p.id, disabled: !live.length, onclick: async (ev) => {
+    const busy = busyButton(ev.currentTarget);
+    if (!busy.begin('비용 계산 중…')) return;
+    try {
     ui.open = true;
     const ids = [...picked];
     let est;
     try { est = await api.post(`/api/products/${p.id}/analysis/estimate`, { imageIds: ids.length ? ids : undefined }); } catch (e) { return toast(e.message, { error: true, recovery: e.recovery }); }
+    busy.label('비용 확인 중…');
     const c = await confirmPaid({ title: a.approved ? '제품 이미지를 다시 분석 (새 버전)' : '제품 이미지 AI 분석', est, confirmLabel: '분석하기',
       body: h('div', { class: 'stack small', style: 'gap:6px' }, h('div', null, `제품 사진 ${est.imageCount}장을 읽고 영어 구조 설명 초안(v${((a.latest && a.latest.v) || 0) + 1})을 만듭니다.`), h('div', { class: 'muted' }, '결과는 초안으로만 저장되며 승인하기 전에는 스토리보드 생성에 쓰이지 않습니다. 기존 승인본은 바뀌지 않습니다.')) });
     if (c === null) return;
+    busy.label('분석 중… (수 초~수십 초)');
     try { await api.post(`/api/products/${p.id}/analysis/generate`, { imageIds: ids.length ? ids : undefined, confirm: c }); ui.v = null; ui.text = null; toast('구조 설명 초안을 만들었습니다. 내용을 확인하고 틀린 부분을 고친 뒤 승인하세요.'); } catch (e) { toast(e.message, { error: true, recovery: e.recovery }); }
     await rerender();
+    } finally { busy.end(); }
   } }, a.versions.length ? '비용 확인 후 새로 분석하기' : '비용 확인 후 분석하기');
   wrap.append(h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' }, analyze, h('span', { class: 'small muted' }, a.current ? `이미지 세트 ${a.current.imageSetVersion ? 'V' + a.current.imageSetVersion : '새 세트(V' + a.current.nextImageSetVersion + ')'} · 분석은 비용 확인 후에만 시작됩니다` : '')));
 
