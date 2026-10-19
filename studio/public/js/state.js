@@ -23,14 +23,14 @@ export async function refresh({ episode = true } = {}) {
 export async function setEpisode(ep) {
   state.episode = ep;
   try { state.summary = await api.get('/api/state'); } catch { /* keep old summary */ }
-  hooks.rerender();
+  await hooks.rerender();
 }
 
 export async function selectEpisode(id) {
   state.episodeId = id;
   state.draft = {};
   await refresh();
-  hooks.rerender();
+  await hooks.rerender();
 }
 
 /** Runs an action, shows errors with recovery steps, and swaps in the returned episode. */
@@ -38,12 +38,12 @@ export async function act(fn, { ok = '' } = {}) {
   try {
     const r = await fn();
     if (r && r.id && r.derived) await setEpisode(r);
-    else { await refresh(); hooks.rerender(); }
+    else { await refresh(); await hooks.rerender(); }
     if (ok) toast(ok);
     return r;
   } catch (e) {
     toast(e.message, { error: true, recovery: e.recovery });
-    try { await refresh(); hooks.rerender(); } catch { /* ignore */ }
+    try { await refresh(); await hooks.rerender(); } catch { /* ignore */ }
     return null;
   }
 }

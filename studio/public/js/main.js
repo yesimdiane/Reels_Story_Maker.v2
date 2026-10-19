@@ -113,22 +113,63 @@ function modePill() {
     h('div', null, state.episodeId ? '작업 중: ' + state.episodeId : ''));
 }
 
+// Re-drawing the view that is already on screen (after a button action, or the 1.5 s job poll) must not flash.
+//   * it is built off-screen and swapped in once its server-loaded blocks have arrived (≤ SETTLE_MS), so the "불러오는 중…" placeholder never shows
+//   * scroll position and the folds (details[data-fold]) the operator opened are restored
+// Navigating to another view keeps the old behaviour: the new view replaces the old one immediately.
+const SETTLE_MS = 1200;
+let shownKey = '';
+let renderToken = 0;
+// The whole address counts (settings tabs and sub-pages share state.view): a different address is a navigation, the same address is a refresh of what is on screen.
+const viewKey = () => [location.hash, state.view, state.episodeId || '', state.productId || ''].join('|');
+
+function captureUi() {
+  return { y: window.scrollY, folds: Array.from(document.querySelectorAll('#stage details[data-fold]')).filter((d) => d.open).map((d) => d.dataset.fold) };
+}
+function restoreUi(ui) {
+  const open = new Set(ui.folds);
+  document.querySelectorAll('#stage details[data-fold]').forEach((d) => { if (open.has(d.dataset.fold)) d.open = true; }); // never force a fold shut: the view may want it open
+  window.scrollTo({ top: ui.y, left: 0, behavior: 'instant' });
+}
+function whenSettled(root, ms, done) {
+  const t0 = Date.now();
+  const check = () => { if (!root.querySelector('.boot') || Date.now() - t0 >= ms) done(); else setTimeout(check, 30); };
+  check();
+}
+
 export function rerender() {
+  const token = ++renderToken;
+  const key = viewKey();
   drawShell();
   const stage = document.getElementById('stage');
   const nav = NAV.find((n) => n[0] === state.view);
-  stage.replaceChildren();
+  const inPlace = key === shownKey && stage.children.length > 0 && !stage.querySelector(':scope > .boot');
+  const target = inPlace ? document.createElement('div') : stage;
+  const ui = inPlace ? captureUi() : null;
+  if (!inPlace) stage.replaceChildren();
   try {
-    if (state.episode && EP_HEADER_VIEWS.includes(state.view)) { const eh = episodeHeader(state.episode); if (eh) stage.append(eh); }
-    if (state.episode && EPISODE_VIEWS.includes(state.view)) stage.append(episodeFlow(state.view, state.episode));
-    if (state.episode && EPISODE_VIEWS.includes(state.view)) { const approvals = studioApprovals(state.view, state.episode); if (approvals) stage.append(approvals); }
-    stage.append(nav[3](state));
+    if (state.episode && EP_HEADER_VIEWS.includes(state.view)) { const eh = episodeHeader(state.episode); if (eh) target.append(eh); }
+    if (state.episode && EPISODE_VIEWS.includes(state.view)) target.append(episodeFlow(state.view, state.episode));
+    if (state.episode && EPISODE_VIEWS.includes(state.view)) { const approvals = studioApprovals(state.view, state.episode); if (approvals) target.append(approvals); }
+    target.append(nav[3](state));
   } catch (e) {
     console.error(e);
-    stage.append(h('div', { class: 'banner err' }, h('div', null, h('b', null, '화면을 그리지 못했습니다'), e.message)));
+    target.append(h('div', { class: 'banner err' }, h('div', null, h('b', null, '화면을 그리지 못했습니다'), e.message)));
   }
-  schedulePoll();
-  placeActionBar();
+  const finish = () => { schedulePoll(); placeActionBar(); };
+  shownKey = key;
+  if (!inPlace) { finish(); return Promise.resolve(); }
+  // Resolves once the new view is on screen (or a newer render took over), so `await act(...)` callers see the final DOM.
+  return new Promise((resolve) => {
+    whenSettled(target, SETTLE_MS, () => {
+      if (token === renderToken) {
+        stage.replaceChildren(...Array.from(target.childNodes));
+        restoreUi(ui);
+        finish();
+      }
+      resolve();
+    });
+  });
 }
 
 function schedulePoll() {
