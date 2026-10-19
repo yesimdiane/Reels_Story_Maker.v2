@@ -180,6 +180,8 @@ function createApp(studio, { token = '', port = 0, host = '127.0.0.1', log = () 
   route('POST', '/api/storylab/:pid/generate', async ({ p, body }) => S.storylab.generate(p.pid, { category: body.category, cast: body.cast, count: body.count, maxDurationSec: body.maxDurationSec, extra: body.extra, confirm: body.confirm }));
   route('POST', '/api/storylab/:pid/concepts/:cid/regenerate', async ({ p, body }) => S.storylab.regenerate(p.pid, p.cid, { feedback: body.feedback, confirm: body.confirm }));
   route('PUT', '/api/storylab/:pid/concepts/:cid', async ({ p, body }) => S.storylab.edit(p.pid, p.cid, body));
+  route('POST', '/api/storylab/:pid/concepts/:cid/refine/estimate', async ({ p, body }) => S.storylab.refineEstimate(p.pid, p.cid, body || {}));
+  route('POST', '/api/storylab/:pid/concepts/:cid/refine', async ({ p, body }) => S.storylab.refine(p.pid, p.cid, body || {}));
   route('POST', '/api/storylab/:pid/concepts/:cid/approve', async ({ p }) => S.storylab.approve(p.pid, p.cid));
   route('POST', '/api/storylab/:pid/concepts/:cid/revoke', async ({ p }) => S.storylab.revoke(p.pid, p.cid));
   route('POST', '/api/storylab/:pid/concepts/:cid/reject', async ({ p, body }) => S.storylab.reject(p.pid, p.cid, body.reason));
