@@ -4,6 +4,7 @@ import { state, act, go, setProduct } from '../state.js';
 import { api } from '../api.js';
 import { pageHead, asyncBlock, confirmPaid } from './common.js';
 import { imageIntake, savedControls } from './image-intake.js';
+import { imagesFromTransfer } from '../image-intake-core.js';
 import { catalog } from './catalog.js';
 import { analysisPanel, analysisOpen } from './product-analysis.js';
 import { openBriefModal } from './product-brief.js';
@@ -150,15 +151,31 @@ function draw(p) {
   // ---- Customer-review research (separate from product reference images) ----
   const rr = p.reviewResearch || { images: [], text: '', analysis: null, approved: false };
   const reviewText = h('textarea', { rows: 5, placeholder: '리뷰 원문을 붙여 넣어도 됩니다. 리뷰별로 구분해 주세요.', 'aria-label': '리뷰 원문' }, rr.text || '');
-  const reviewFile = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp', multiple: true, 'aria-label': '리뷰 스크린샷', onchange: async (e) => {
-    const files = Array.from(e.target.files || []); e.target.value = '';
+  // One path for the file picker, paste and drag-and-drop. Review screenshots are research, never product reference images.
+  const addReviewFiles = async (files, source = 'file') => {
+    files = files.filter((f) => /^image\//i.test(f.type || ''));
+    if (!files.length) return toast('이미지 파일만 추가할 수 있습니다.', { error: true });
     if (files.length + (rr.images || []).length + p.images.filter((im) => im.kind === 'uploaded' && !im.removed && im.status !== 'replaced').length > 10) return toast('제품과 리뷰 스크린샷은 합쳐 최대 10장입니다.', { error: true });
-    for (const file of files) {
+    for (const [n, f] of files.entries()) {
+      const file = source === 'file' ? f : new File([f], `${source === 'paste' ? '붙여넣은' : '끌어놓은'} 리뷰 ${new Date().toLocaleTimeString('ko-KR')} ${n + 1}.${(f.type.split('/')[1] || 'png').replace('jpeg', 'jpg')}`, { type: f.type });
       try { await api.upload('/api/products/' + p.id + '/reviews/image', file); }
-      catch (err) { toast(err.message, { error: true, recovery: err.recovery }); return; }
+      catch (err) { toast(err.message, { error: true, recovery: err.recovery }); await act(async () => null); return; }
     }
     toast('리뷰 캡처를 추가했습니다.'); await act(async () => null);
+  };
+  const reviewFile = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp', multiple: true, 'aria-label': '리뷰 스크린샷', onchange: async (e) => {
+    const files = Array.from(e.target.files || []); e.target.value = '';
+    await addReviewFiles(files);
   } });
+  // Click here, then Cmd/Ctrl+V. stopPropagation keeps the page-wide paste handler (which feeds PRODUCT images) out of it.
+  const reviewDrop = h('div', { class: 'dropzone review-drop', tabindex: 0, role: 'button', 'data-review-dropzone': '', 'aria-label': '리뷰 스크린샷 추가: 클릭 후 붙여넣기 또는 끌어다 놓기',
+    onpaste: (e) => { const files = imagesFromTransfer(e.clipboardData); if (!files.length) return; e.preventDefault(); e.stopPropagation(); addReviewFiles(files, 'paste'); },
+    ondragover: (e) => { e.preventDefault(); reviewDrop.classList.add('over'); },
+    ondragleave: () => reviewDrop.classList.remove('over'),
+    ondrop: (e) => { e.preventDefault(); reviewDrop.classList.remove('over'); const files = imagesFromTransfer(e.dataTransfer); if (files.length) addReviewFiles(files, 'drop'); },
+    onclick: () => reviewDrop.focus() },
+    h('div', { class: 'small' }, '여기를 클릭한 뒤 스크린샷을 붙여넣기(Cmd/Ctrl+V)하거나 이미지를 끌어다 놓으세요'),
+    h('div', { class: 'small muted' }, '제품 이미지가 아니라 리뷰 자료로 저장됩니다.'));
   const saveReviewText = async () => {
     try { await api.put('/api/products/' + p.id + '/reviews', { text: reviewText.value }); toast('리뷰 원문을 저장했습니다.'); await act(async () => null); }
     catch (err) { toast(err.message, { error: true }); }
@@ -178,7 +195,7 @@ function draw(p) {
   const reviewBlock = h('div', { class: 'stack', style: 'gap:12px', 'data-product-reviews': p.id },
     h('div', { class: 'card-head' }, h('h2', null, '리뷰 리서치 · 총 업로드 10장 이내'), chip(rr.approved ? '분석 승인' : '미승인', rr.approved ? 'done' : 'attention')),
     h('p', { class: 'small muted' }, '리뷰는 소비자 개인 경험입니다. 확인된 제품 사양이 아니므로 광고 문구에 사실처럼 사용하지 않습니다. 리뷰 캡처는 제품 레퍼런스 사진과 분리됩니다.'),
-    h('div', { class: 'field' }, h('label', null, '리뷰 스크린샷 (제품 포함 총 10장)'), reviewFile),
+    h('div', { class: 'field' }, h('label', null, '리뷰 스크린샷 (제품 포함 총 10장)'), reviewFile, reviewDrop),
     h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' }, ...(rr.images || []).map((im, i) =>
       h('figure', { style: 'margin:0;width:110px' }, h('img', { src: '/media/product-review/' + p.id + '/' + i, alt: '리뷰 캡처 ' + (i + 1), style: 'width:100%;height:110px;object-fit:contain' }), h('figcaption', { class: 'small muted' }, '리뷰 ' + (i + 1))))),
     h('div', { class: 'field' }, h('label', null, '리뷰 원문 (선택)'), reviewText),
