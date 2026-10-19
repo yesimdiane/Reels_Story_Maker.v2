@@ -268,8 +268,8 @@ function createApp(studio, { token = '', port = 0, host = '127.0.0.1', log = () 
   // ---- projects, scene approval, Image Development hand-off (none of these can spend money) ----
   route('GET', '/api/projects', async () => ({ projects: S.projects.listProjects() }));
   // ---- 씬 다시 생성하기 (one scene, from its 시각 연출 · 액션): proposal → review → accept / cancel ----
-  route('POST', '/api/episodes/:id/scenes/:sid/regenerate/estimate', async ({ p, body }) => S.sceneRegen.estimate(p.id, p.sid, { visual: body.visual, action: body.action }));
-  route('POST', '/api/episodes/:id/scenes/:sid/regenerate', async ({ p, body }) => { await S.sceneRegen.regenerate(p.id, p.sid, { visual: body.visual, action: body.action, confirm: body.confirm }); return ep(p.id); });
+  route('POST', '/api/episodes/:id/scenes/:sid/regenerate/estimate', async ({ p, body }) => S.sceneRegen.estimate(p.id, p.sid, { visual: body.visual, action: body.action, note: body.note }));
+  route('POST', '/api/episodes/:id/scenes/:sid/regenerate', async ({ p, body }) => { await S.sceneRegen.regenerate(p.id, p.sid, { visual: body.visual, action: body.action, note: body.note, confirm: body.confirm }); return ep(p.id); });
   route('POST', '/api/episodes/:id/scenes/:sid/regenerate/accept', async ({ p }) => { await S.sceneRegen.accept(p.id, p.sid); return ep(p.id); });
   route('POST', '/api/episodes/:id/scenes/:sid/regenerate/cancel', async ({ p }) => { await S.sceneRegen.cancel(p.id, p.sid); return ep(p.id); });
   route('POST', '/api/episodes/:id/scenes/:sid/approve', async ({ p }) => { await S.projects.approveScene(p.id, p.sid); return ep(p.id); });

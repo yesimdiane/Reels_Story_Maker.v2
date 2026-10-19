@@ -8,14 +8,17 @@ import { setCollapsed } from './scene-collapse.js';
 
 const base = (ep, sid) => `/api/episodes/${ep.id}/scenes/${sid}/regenerate`;
 
-export async function startRegeneration(ep, sc) {
-  const body = { visual: sc.visual, action: sc.action };
+/** `note`: the operator's plain-language change request (optional). `busy`: the clicked button's busyButton, for the progress label. */
+export async function startRegeneration(ep, sc, note = '', busy = null) {
+  const body = { visual: sc.visual, action: sc.action, note };
   if (String(body.visual || '').trim().length < 10) return toast('"시각 연출 · 액션"에 연출을 먼저 적어 주세요 (이 내용이 재생성의 기준입니다)', { error: true });
   let est;
   try { est = await api.post(base(ep, sc.id) + '/estimate', body); } catch (e) { return toast(e.message, { error: true, recovery: e.recovery }); }
+  if (busy) busy.label('비용 확인 중…');
   const c = await confirmPaid({ title: `${sc.id} 씬 다시 생성하기`, est, confirmLabel: '생성',
     body: h('div', { class: 'stack small', style: 'gap:6px' }, h('div', null, '입력한 시각 연출 · 액션을 기준으로 이 씬 하나만 다시 만듭니다 (앞뒤 씬 내용·출연 캐릭터·제품 정보를 참고).'), h('div', { class: 'muted' }, '결과는 검토용 제안으로만 보입니다. 현재 씬과 승인 상태는 "제안 적용"을 누를 때까지 그대로이며, 다른 씬은 바뀌지 않습니다. 이미지·영상·음성은 만들지 않습니다.')) });
   if (c === null) return;
+  if (busy) busy.label('씬 다시 만드는 중… (수 초~수십 초)');
   await act(() => api.post(base(ep, sc.id), Object.assign({ confirm: c }, body)), { ok: '재생성 제안이 준비됐습니다 — 검토 후 적용하세요' });
 }
 
