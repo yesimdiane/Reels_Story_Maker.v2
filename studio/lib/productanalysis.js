@@ -278,4 +278,4 @@ function createProductAnalysis({ products, router, log = () => {} }) {
   return { view, estimate, generate, edit, approve, contextFor, registerImageSet, peekSetVersion, selectImages, SYSTEM, SECTIONS, FIXED_NEGATIVES, SAMPLE_MARK, MAX_ANALYSIS_IMAGES };
 }
 
-module.exports = { createProductAnalysis, SAMPLE_MARK };
+module.exports = { createProductAnalysis, SAMPLE_MARK, FIXED_NEGATIVES };
