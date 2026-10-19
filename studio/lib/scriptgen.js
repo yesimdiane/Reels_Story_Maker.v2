@@ -95,6 +95,10 @@ function createScriptGen({ store, products, storylab, episodeIds, prompts, prese
     twist: { mode: 'beat', key: 'unexpected_twist', instruction: 'STRENGTHEN THE UNEXPECTED TWIST: rewrite ONLY the unexpected_twist beat so the reversal is more surprising and stays directly connected to the escalating problem (background-world absurdity, unexpected character behaviour; never unrelated randomness).' },
     bridge: { mode: 'beat', key: 'product_bridge', instruction: 'IMPROVE THE PRODUCT BRIDGE: rewrite ONLY the product_bridge beat so the consequences of the story create a more believable problem at home and a natural excuse for Diane to buy the product. Do not advertise.' },
     ending: { mode: 'ending', instruction: '' },
+    // Operator-directed revisions of the other three beats: the operator's instruction is REQUIRED (it is the whole point of these actions).
+    setup: { mode: 'beat', key: 'setup', needsInstruction: true, instruction: 'REVISE THE SETUP BEAT: rewrite ONLY the setup beat exactly as the ADDITIONAL INSTRUCTION below asks. Keep the problem, the escalation, the twist, the resolution and the product bridge as they are, and keep the story connected (same problem, same characters).' },
+    problem: { mode: 'beat', key: 'problem', needsInstruction: true, instruction: 'REVISE THE PROBLEM BEAT: rewrite ONLY the problem beat exactly as the ADDITIONAL INSTRUCTION below asks. Keep the setup, the escalation, the twist, the resolution and the product bridge as they are, and keep the story connected (same problem, same characters).' },
+    resolution: { mode: 'beat', key: 'resolution', needsInstruction: true, instruction: 'REVISE THE RESOLUTION BEAT: rewrite ONLY the resolution beat exactly as the ADDITIONAL INSTRUCTION below asks. Keep the setup, the problem, the escalation, the twist and the product bridge as they are, and keep the story connected (same problem, same characters).' },
   };
 
 
@@ -126,6 +130,7 @@ function createScriptGen({ store, products, storylab, episodeIds, prompts, prese
     const structured = F.isStructured(ep);
     const act = structured ? STORY_ACTIONS[action || 'story'] : null;
     if (structured && !act) throw new StudioError('BAD_ACTION', '알 수 없는 대본 생성 동작: ' + action, { status: 400 });
+    if (structured && act.needsInstruction && !String(extra || '').trim()) throw new StudioError('EMPTY_INSTRUCTION', '고치고 싶은 내용을 입력하세요.', { status: 400 });
     const L = lib();
     // Creative text comes from the selected preset version; the constraints below it are enforced by code (presets.LOCKED).
     const sel = Object.assign(structured ? { comedyLevel: 3 } : {}, ep.promptPreset || {}, selOverride || {}); // the fixed formula defaults to comedy intensity 3
@@ -227,7 +232,7 @@ function createScriptGen({ store, products, storylab, episodeIds, prompts, prese
   /** The characters a script may use: the episode's cast (selected in Story Lab) — never the whole library. Legacy episodes keep their own list. */
   const castIdList = (ep) => { const all = lib().characters.map((c) => c.id); const own = ((ep && ep.characters) || []).filter((id) => all.includes(id)); return own.length ? own : all; };
   const charIds = (ep) => new Set(castIdList(ep));
-  const ACTION_LABEL = { story: '코미디 스토리 다시 만들기', escalation: '위기 2(과장) 개선', twist: '절정(반전) 강화', bridge: '제품 연결 개선', ending: '제품별 엔딩 대사 다시 만들기' };
+  const ACTION_LABEL = { story: '코미디 스토리 다시 만들기', setup: '도입 수정', problem: '위기 1 수정', resolution: '결말 수정', escalation: '위기 2(과장) 개선', twist: '절정(반전) 강화', bridge: '제품 연결 개선', ending: '제품별 엔딩 대사 다시 만들기' };
 
   /**
    * One paid AI action on a formula episode. Part B (the ending template) is never rewritten by Part A actions;

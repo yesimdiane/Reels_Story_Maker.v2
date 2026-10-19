@@ -3,7 +3,7 @@
 import { h, chip, icon, toast, confirmDialog } from '../ui.js';
 import { state, act } from '../state.js';
 import { api } from '../api.js';
-import { confirmPaid } from './common.js';
+import { confirmPaid, busyButton } from './common.js';
 import { attach } from './script-validate.js';
 import { withTranslate } from './translate-box.js';
 
@@ -12,9 +12,14 @@ const ACTIONS = {
   escalation: ['위기 2 개선 (Improve Escalation)', '같은 문제가 더 터무니없이 커지도록 "위기 2" 단계만 다시 씁니다.'],
   twist: ['절정 강화 (Strengthen Twist)', '반전이 더 놀랍고 문제와 직접 이어지도록 "절정" 단계만 다시 씁니다.'],
   bridge: ['제품 연결 개선 (Improve Product Bridge)', '이야기의 결과로 집에서 생기는 문제와 쇼핑 핑계가 더 자연스럽도록 "제품 연결" 단계만 다시 씁니다.'],
+  setup: ['도입 수정 (Revise Setup)', '"도입" 단계만 적어 주신 지시문대로 다시 씁니다. 나머지 단계와 PART B 엔딩은 그대로입니다.'],
+  problem: ['위기 1 수정 (Revise Problem)', '"위기 1" 단계만 적어 주신 지시문대로 다시 씁니다. 나머지 단계와 PART B 엔딩은 그대로입니다.'],
+  resolution: ['결말 수정 (Revise Resolution)', '"결말" 단계만 적어 주신 지시문대로 다시 씁니다. 나머지 단계와 PART B 엔딩은 그대로입니다.'],
   ending: ['제품별 엔딩 대사 다시 만들기', '3컷 엔딩의 제품별 값(제품 이름·시연 동작·대사)만 다시 만듭니다. 구조와 잭의 거부 개그는 그대로입니다.'],
 };
 const BEAT_ACTION = { absurd_escalation: 'escalation', unexpected_twist: 'twist', product_bridge: 'bridge' };
+// every story beat can be revised with a written instruction (the preset buttons in the card header stay as they are)
+const BEAT_REFINE = { setup: 'setup', problem: 'problem', absurd_escalation: 'escalation', unexpected_twist: 'twist', resolution: 'resolution', product_bridge: 'bridge' };
 
 const tag = (text, kind) => h('span', { class: 'chip ' + (kind || ''), style: 'font-size:11px' }, text);
 const EPISODE = () => tag('에피소드 고유', 'attention');
@@ -43,14 +48,16 @@ export function formulaLayout({ ep, d, blocks, dirty, redrawAll, v, index, addSc
   const sceneLinks = (ids) => h('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, ids.map((id) => h('button', { class: 'chip', type: 'button', onclick: () => focusScene(id) }, '✎ ' + id + ' 씬 편집')));
   const blockOf = (id) => (blocks.find((b) => b.sc.id === id) || {}).block;
 
-  const run = async (action) => {
+  const run = async (action, { extra = '', busy = null } = {}) => {
     // protected overwrite: ask once when the server says hand edits / an approved script would be replaced
     const route = (state.summary.ai.routing || []).find((r) => r.task === 'scriptWriting') || { provider: 'mock' };
     let est;
-    try { est = await api.post(`/api/episodes/${ep.id}/script/estimate`, { action }); } catch (e) { return toast(e.message, { error: true, recovery: e.recovery }); }
+    try { est = await api.post(`/api/episodes/${ep.id}/script/estimate`, { action, extra }); } catch (e) { return toast(e.message, { error: true, recovery: e.recovery }); }
+    if (busy) busy.label('비용 확인 중…');
     const c = await confirmPaid({ title: ACTIONS[action][0] + (route.provider === 'mock' ? ' (샘플)' : ' (유료일 수 있음)'), est, confirmLabel: '실행', body: h('p', { class: 'small muted', style: 'margin:0' }, ACTIONS[action][1] + ' 이전 대본은 버전 기록에 보관됩니다.') });
     if (c === null) return;
-    const call = (overwrite) => api.post(`/api/episodes/${ep.id}/script/regenerate`, { action, confirm: c, overwrite });
+    if (busy) busy.label('다시 쓰는 중… (수 초~수십 초)');
+    const call = (overwrite) => api.post(`/api/episodes/${ep.id}/script/regenerate`, { action, confirm: c, overwrite, extra });
     state.draft.script = null;
     try { await call(false); } catch (e) {
       if (['SCRIPT_EXISTS', 'MANUAL_EDITS', 'SCRIPT_APPROVED'].includes(e.code)) {
@@ -62,6 +69,23 @@ export function formulaLayout({ ep, d, blocks, dirty, redrawAll, v, index, addSc
     await act(async () => null);
   };
   const actionBtn = (action, cls = 'btn sm ghost') => h('button', { class: cls, title: ACTIONS[action][1], disabled: !ep.derived.concept.approved || (action !== 'story' && action !== 'ending' && !hasA), onclick: () => run(action) }, ACTIONS[action][0]);
+
+  // Written instruction for ONE beat -> the same paid regenerate action (estimate -> cost confirmation -> request; a protected overwrite is asked again).
+  const refineBox = (b) => {
+    const action = BEAT_REFINE[b.key];
+    const noScenes = !b.sceneIds.length;
+    const ta = h('textarea', { rows: 2, maxlength: 1000, 'data-beat-instruction': b.key, 'aria-label': `${b.label} AI 수정 지시문`, placeholder: '이 단계에서 고치고 싶은 내용을 적어 주세요. 예) 다이앤의 반응을 더 장난스럽게, 반전을 더 늦게 보여주기…' });
+    const btn = h('button', { class: 'btn sm clay', type: 'button', 'data-beat-refine': b.key, disabled: !ep.derived.concept.approved || noScenes,
+      title: noScenes ? '먼저 코미디 스토리를 만들어 이 단계에 장면이 있어야 합니다' : ACTIONS[action][1], onclick: async (ev) => {
+        const instruction = ta.value.trim();
+        if (!instruction) return toast('고치고 싶은 내용을 입력하세요', { error: true });
+        if (d.dirty || d.epDirty) return toast('저장하지 않은 변경이 있습니다. 먼저 저장한 뒤 AI 수정을 실행하세요 (이 단계의 장면이 새로 바뀝니다).', { error: true });
+        const busy = busyButton(ev.currentTarget);
+        if (!busy.begin('비용 계산 중…')) return;
+        try { await run(action, { extra: instruction, busy }); } finally { busy.end(); }
+      } }, '🪄 이 단계 AI로 다시 쓰기');
+    return h('div', { class: 'card flat stack', style: 'gap:6px', 'data-beat-refine-box': b.key }, ta, h('div', { class: 'row between', style: 'flex-wrap:wrap;gap:6px' }, h('div', { class: 'small muted' }, '유료 AI 호출입니다 (비용 확인 후 실행). 이 단계만 바뀌고 다른 단계와 PART B 엔딩은 그대로입니다.'), btn));
+  };
 
   const field = (label, value, on, { rows = 2, kind = '', lang, rf } = {}) => {
     const input = rows === 1 ? h('input', { type: 'text', value, lang, maxLength: 24, oninput: (e) => { on(e.target.value); dirty(); } }) : h('textarea', { rows, lang, oninput: (e) => { on(e.target.value); dirty(); } }, value);
@@ -80,6 +104,7 @@ export function formulaLayout({ ep, d, blocks, dirty, redrawAll, v, index, addSc
       h('div', { class: 'row' }, h('span', { class: 'eyebrow' }, `${i + 1}/6`), h('h3', { style: 'margin:0' }, `${b.label} · ${b.labelEn}`), EPISODE()),
       h('div', { class: 'row' }, chip(`${b.durationSec || 0}초`, ''), chip('장면 ' + (b.sceneIds.length ? b.sceneIds.join(', ') : '없음'), b.sceneIds.length ? '' : 'err'), BEAT_ACTION[b.key] ? actionBtn(BEAT_ACTION[b.key]) : null)));
     card.append(h('div', { class: 'small muted' }, b.role));
+    card.append(refineBox(b));
     card.append(h('div', { class: 'grid two' },
       field('단계 제목 (한국어)', bd.title_ko, (x) => (bd.title_ko = x), { rows: 1, lang: 'ko', rf: `B:${b.key}:title_ko` }),
       h('div', { class: 'field' }, h('label', null, '한국어 자막 요약 (대사에서 자동)'), h('div', { class: 'small', style: 'min-height:38px' }, b.subtitle_ko || '—'))));
