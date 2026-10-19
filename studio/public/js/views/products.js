@@ -6,6 +6,7 @@ import { pageHead, asyncBlock, confirmPaid } from './common.js';
 import { imageIntake, savedControls } from './image-intake.js';
 import { catalog } from './catalog.js';
 import { analysisPanel, analysisOpen } from './product-analysis.js';
+import { openBriefModal } from './product-brief.js';
 
 const KIND_CHIP = { retrieved: ['원본 · 쇼핑몰 수집', 'mock'], uploaded: ['직접 업로드', ''], ai_generated: ['AI 생성 · 제조사 사진 아님', 'attention'] };
 const STATUS_CHIP = { pending: ['검토 대기', ''], approved: ['승인', 'done'], rejected: ['거절', 'err'], replaced: ['교체됨', 'mock'] };
@@ -292,7 +293,8 @@ function draw(p) {
   const summary = h('section', { class: 'card prod-summary', 'data-product-summary': p.id },
     p.mainImage ? h('img', { class: 'prod-main', src: p.mainImage.url, alt: '대표 참조 이미지' }) : h('div', { class: 'prod-main empty' }, '대표 이미지 없음'),
     h('div', { class: 'stack', style: 'gap:8px;min-width:0' },
-      h('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, h('span', { class: 'ep-code' }, p.code || '코드 없음'), chip(...refChip), chip(p.readiness.ok ? '스토리 준비 완료' : '준비 필요', p.readiness.ok ? 'done' : 'attention')),
+      h('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, h('span', { class: 'ep-code' }, p.code || '코드 없음'), chip(...refChip), chip(p.readiness.ok ? '스토리 준비 완료' : '준비 필요', p.readiness.ok ? 'done' : 'attention'),
+      h('button', { class: 'btn sm ghost', type: 'button', 'data-brief-open': p.id, onclick: () => openBriefModal(p, () => act(async () => null)) }, 'AI 분석 결과 보기')),
       codeBox(p),
       h('h2', { style: 'margin:0;overflow-wrap:anywhere' }, p.name || '제품'),
       p.url ? h('a', { class: 'small', href: p.url, target: '_blank', rel: 'noopener', style: 'overflow-wrap:anywhere' }, p.url) : h('div', { class: 'small muted' }, '제품 링크 없음 (직접 입력)'),

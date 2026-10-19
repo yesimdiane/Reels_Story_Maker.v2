@@ -744,3 +744,5 @@ body.scene-dragging-body { cursor: grabbing; user-select: none; -webkit-user-sel
 .catalog-code { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
 .ep-flow { margin: -4px 0 14px; }
 @media (max-width: 640px) { .cast-bar-field { flex-direction: column; align-items: stretch; gap: 4px; } }
+.brief-editor { font-family: var(--mono, ui-monospace, monospace); font-size: 12.5px; line-height: 1.6; min-height: 240px; }
+.develop-box { background: var(--card-soft, #f8f4ec); border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); padding: 12px; }

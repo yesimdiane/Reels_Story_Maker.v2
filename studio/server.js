@@ -159,6 +159,8 @@ function createApp(studio, { token = '', port = 0, host = '127.0.0.1', log = () 
   route('POST', '/api/products/:id/analysis/generate', async ({ p, body }) => S.productAnalysis.generate(p.id, { imageIds: body.imageIds, confirm: body.confirm }));
   route('PUT', '/api/products/:id/analysis/:v', async ({ p, body }) => S.productAnalysis.edit(p.id, Number(p.v), body.text));
   route('POST', '/api/products/:id/analysis/:v/approve', async ({ p }) => S.productAnalysis.approve(p.id, Number(p.v)));
+  route('POST', '/api/products/:id/analysis/:v/develop/estimate', async ({ p, body }) => S.productAnalysis.developEstimate(p.id, Number(p.v), body.feedback));
+  route('POST', '/api/products/:id/analysis/:v/develop', async ({ p, body }) => S.productAnalysis.develop(p.id, Number(p.v), body.feedback, body.confirm));
   route('POST', '/api/products/:id/references/approve', async ({ p, body }) => S.products.approveReferenceSet(p.id, { imageIds: body.imageIds }));
   route('POST', '/api/products/:id/references/waive', async ({ p, body }) => S.products.waiveReferences(p.id, body.reason));
 
