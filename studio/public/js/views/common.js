@@ -47,6 +47,24 @@ export function videoTabs(active) {
  * Per-generation confirmation for AI calls. est = router estimate { provider, model, mock, usd, note }.
  * Resolves to null (cancelled) or the `confirm` object the API expects. Mock (sample) routes need no confirmation.
  */
+/**
+ * Busy state for a button that starts a slow (or paid) request: disabled + a progress label while it runs, restored afterwards.
+ * Keeps the button's own children (icons) and its original disabled state. `begin()` returns false when it is already busy.
+ */
+export function busyButton(btn) {
+  const kids = Array.from(btn.childNodes);
+  const wasDisabled = btn.disabled;
+  return {
+    begin(label) {
+      if (btn.getAttribute('aria-busy') === 'true') return false;
+      btn.disabled = true; btn.setAttribute('aria-busy', 'true'); btn.replaceChildren(label);
+      return true;
+    },
+    label(text) { btn.replaceChildren(text); },
+    end() { btn.disabled = wasDisabled; btn.removeAttribute('aria-busy'); btn.replaceChildren(...kids); },
+  };
+}
+
 export function confirmPaid({ title, est, body, confirmLabel = '실행' }) {
   if (est && est.mock) return Promise.resolve({});
   return new Promise((resolve) => {
