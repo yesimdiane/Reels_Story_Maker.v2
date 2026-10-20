@@ -1,6 +1,6 @@
 // Script Studio for the fixed episode formula: PART A (six beats, unique to the episode) and PART B (three reusable ending shots).
 // The scene editors themselves are built by script.js and handed in; this file lays them out and adds the beat / template controls.
-import { h, chip, icon, toast, confirmDialog } from '../ui.js';
+import { h, chip, icon, toast, confirmDialog, modal } from '../ui.js';
 import { state, act } from '../state.js';
 import { api } from '../api.js';
 import { confirmPaid, busyButton } from './common.js';
@@ -45,7 +45,7 @@ export function formulaLayout({ ep, d, blocks, dirty, redrawAll, v, index, addSc
   const locked = !!fx.structureLocked;
   const hasA = ep.scenes.some((s) => s.part === 'A');
   const withKey = (el, rf) => (rf ? attach(index, el, rf) : el);
-  const sceneLinks = (ids) => h('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, ids.map((id) => h('button', { class: 'chip', type: 'button', onclick: () => focusScene(id) }, '✎ ' + id + ' 씬 편집')));
+  const sceneLinks = (ids) => h('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, ids.map((id) => { const sc = ep.scenes.find((x) => x.id === id) || {}; return h('button', { class: 'chip', type: 'button', title: `${id} 씬 편집`, onclick: () => focusScene(id) }, `✏️ ${id} ${sc.title_ko || sc.title || '씬 편집'}`); }));
   const blockOf = (id) => (blocks.find((b) => b.sc.id === id) || {}).block;
 
   const run = async (action, { extra = '', busy = null } = {}) => {
@@ -71,20 +71,26 @@ export function formulaLayout({ ep, d, blocks, dirty, redrawAll, v, index, addSc
   const actionBtn = (action, cls = 'btn sm ghost') => h('button', { class: cls, title: ACTIONS[action][1], disabled: !ep.derived.concept.approved || (action !== 'story' && action !== 'ending' && !hasA), onclick: () => run(action) }, ACTIONS[action][0]);
 
   // Written instruction for ONE beat -> the same paid regenerate action (estimate -> cost confirmation -> request; a protected overwrite is asked again).
-  const refineBox = (b) => {
+  // The card only carries one "🪄 AI로 다듬기" button; the instruction is written in a small dialog.
+  const openRefine = (b) => {
     const action = BEAT_REFINE[b.key];
-    const noScenes = !b.sceneIds.length;
-    const ta = h('textarea', { rows: 2, maxlength: 1000, 'data-beat-instruction': b.key, 'aria-label': `${b.label} AI 수정 지시문`, placeholder: '이 단계에서 고치고 싶은 내용을 적어 주세요. 예) 다이앤의 반응을 더 장난스럽게, 반전을 더 늦게 보여주기…' });
-    const btn = h('button', { class: 'btn sm clay', type: 'button', 'data-beat-refine': b.key, disabled: !ep.derived.concept.approved || noScenes,
-      title: noScenes ? '먼저 코미디 스토리를 만들어 이 단계에 장면이 있어야 합니다' : ACTIONS[action][1], onclick: async (ev) => {
+    modal((close) => {
+      const ta = h('textarea', { rows: 2, maxlength: 1000, 'data-beat-instruction': b.key, 'aria-label': `${b.label} AI 수정 지시문`, placeholder: '이 단계에서 고치고 싶은 내용을 적어 주세요. 예) 다이앤의 반응을 더 장난스럽게, 반전을 더 늦게 보여주기…' });
+      const btn = h('button', { class: 'btn clay', type: 'button', 'data-beat-refine': b.key, onclick: async (ev) => {
         const instruction = ta.value.trim();
         if (!instruction) return toast('고치고 싶은 내용을 입력하세요', { error: true });
         if (d.dirty || d.epDirty) return toast('저장하지 않은 변경이 있습니다. 먼저 저장한 뒤 AI 수정을 실행하세요 (이 단계의 장면이 새로 바뀝니다).', { error: true });
         const busy = busyButton(ev.currentTarget);
         if (!busy.begin('비용 계산 중…')) return;
-        try { await run(action, { extra: instruction, busy }); } finally { busy.end(); }
+        try { await run(action, { extra: instruction, busy }); close(); } finally { busy.end(); }
       } }, '🪄 이 단계 AI로 다시 쓰기');
-    return h('div', { class: 'card flat stack', style: 'gap:6px', 'data-beat-refine-box': b.key }, ta, h('div', { class: 'row between', style: 'flex-wrap:wrap;gap:6px' }, h('div', { class: 'small muted' }, '유료 AI 호출입니다 (비용 확인 후 실행). 이 단계만 바뀌고 다른 단계와 PART B 엔딩은 그대로입니다.'), btn));
+      return h('div', { class: 'stack', style: 'gap:10px', 'data-beat-refine-box': b.key },
+        h('h3', { style: 'margin:0' }, `${b.label} · ${b.labelEn} — AI로 다듬기`),
+        h('div', { class: 'small muted' }, ACTIONS[action][1]),
+        ta,
+        h('div', { class: 'small muted' }, '유료 AI 호출입니다 (비용 확인 후 실행). 이전 대본은 버전 기록에 남습니다.'),
+        h('div', { class: 'row', style: 'gap:8px;justify-content:flex-end' }, h('button', { class: 'btn ghost', type: 'button', onclick: close }, '취소'), btn));
+    });
   };
 
   const field = (label, value, on, { rows = 2, kind = '', lang, rf } = {}) => {
@@ -102,13 +108,16 @@ export function formulaLayout({ ep, d, blocks, dirty, redrawAll, v, index, addSc
     const card = h('div', { class: 'card stack', style: 'gap:12px;border-left:4px solid var(--clay, #b4683a)', 'data-rf': `B:${b.key}:card` });
     card.append(h('div', { class: 'row between', style: 'flex-wrap:wrap;gap:8px' },
       h('div', { class: 'row' }, h('span', { class: 'eyebrow' }, `${i + 1}/6`), h('h3', { style: 'margin:0' }, `${b.label} · ${b.labelEn}`), EPISODE()),
-      h('div', { class: 'row' }, chip(`${b.durationSec || 0}초`, ''), chip('장면 ' + (b.sceneIds.length ? b.sceneIds.join(', ') : '없음'), b.sceneIds.length ? '' : 'err'), BEAT_ACTION[b.key] ? actionBtn(BEAT_ACTION[b.key]) : null)));
+      h('div', { class: 'row' }, chip(`${b.durationSec || 0}초`, ''), chip('장면 ' + (b.sceneIds.length ? b.sceneIds.join(', ') : '없음'), b.sceneIds.length ? '' : 'err'), BEAT_ACTION[b.key] ? actionBtn(BEAT_ACTION[b.key]) : null,
+        h('button', { class: 'btn sm clay', type: 'button', 'data-beat-refine-open': b.key, disabled: !ep.derived.concept.approved || !b.sceneIds.length, title: !b.sceneIds.length ? '먼저 코미디 스토리를 만들어 이 단계에 장면이 있어야 합니다' : ACTIONS[BEAT_REFINE[b.key]][1], onclick: () => openRefine(b) }, '🪄 AI로 다듬기'))));
     card.append(h('div', { class: 'small muted' }, b.role));
-    card.append(refineBox(b));
-    card.append(h('div', { class: 'grid two' },
+    card.append(h('div', { class: 'small' }, h('b', null, bd.title_ko || '(제목 없음)'), h('span', { class: 'muted' }, b.subtitle_ko ? ' · ' + b.subtitle_ko : '')));
+    const fieldBox = h('div', { class: 'stack', style: 'gap:12px;margin-top:10px' });
+    fieldBox.append(h('div', { class: 'grid two' },
       field('단계 제목 (한국어)', bd.title_ko, (x) => (bd.title_ko = x), { rows: 1, lang: 'ko', rf: `B:${b.key}:title_ko` }),
       h('div', { class: 'field' }, h('label', null, '한국어 자막 요약 (대사에서 자동)'), h('div', { class: 'small', style: 'min-height:38px' }, b.subtitle_ko || '—'))));
-    card.append(h('div', { class: 'grid two' }, field('이야기 설명 (English) — 직접 쓰면 AI가 그대로 살립니다', bd.story_en, (x) => (bd.story_en = x), { rows: 2, lang: 'en' }), field('비주얼 방향', bd.visual, (x) => (bd.visual = x), { rows: 2 })));
+    fieldBox.append(h('div', { class: 'grid two' }, field('이야기 설명 (English) — 직접 쓰면 AI가 그대로 살립니다', bd.story_en, (x) => (bd.story_en = x), { rows: 2, lang: 'en' }), field('비주얼 방향', bd.visual, (x) => (bd.visual = x), { rows: 2 })));
+    card.append(h('details', { 'data-beat-fields': b.key }, h('summary', null, '단계 내용 직접 수정 (제목 · 이야기 · 비주얼)'), fieldBox));
     b.sceneIds.forEach((id) => { const bl = blockOf(id); if (bl) card.append(bl); });
     if (focusScene) card.append(sceneLinks(b.sceneIds));
     card.append(h('div', { class: 'row' }, h('button', { class: 'btn sm ghost', type: 'button', onclick: () => addSceneIn && addSceneIn(b.key) }, icon('plus'), '이 단계에 씬 추가'), b.sceneIds.length && dupScene ? h('button', { class: 'btn sm ghost', type: 'button', 'data-dup-beat': b.key, title: '이 단계의 마지막 씬을 그대로 복사해 바로 뒤에 미승인 상태로 만듭니다', onclick: () => dupScene(b.sceneIds[b.sceneIds.length - 1]) }, '⎘ 씬 복제') : null));
