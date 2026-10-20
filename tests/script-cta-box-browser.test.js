@@ -1,6 +1,6 @@
 'use strict';
 // Script Studio: the ManyChat keyword (required by the server) is visible right under the last story beat; the CTA lines / card length are folded
-// and open by themselves on a validation error; the structure map stays in the folded episode tools. Fake AI: nothing is billed.
+// and open by themselves on a validation error; the structure map sits at the top of the page. Fake AI: nothing is billed.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createApp } = require('../studio/server');
@@ -23,7 +23,7 @@ async function open(s, id) {
   return { app, browser, page, errors, base };
 }
 
-test('the CTA box sits between the last story beat and the fixed ending; only the keyword is open; the structure map stays folded', { skip, timeout: 150000 }, async () => {
+test('the CTA box sits between the last story beat and the fixed ending; only the keyword is open; the structure map is at the top', { skip, timeout: 150000 }, async () => {
   const { s, id } = await setupEpisode({ concepts: conceptsForPrompt });
   const { app, browser, page, errors } = await open(s, id);
   try {
@@ -47,7 +47,7 @@ test('the CTA box sits between the last story beat and the fixed ending; only th
     assert.equal(layout.nextIsScene, true, 'the ending scenes follow'); assert.equal(layout.nextLocked, true, 'the next card is the fixed ending (locked)');
     assert.equal(layout.keywordHidden, false, 'the keyword is visible without opening anything');
     assert.equal(layout.ctaDetailsOpen, false); assert.equal(layout.ctaLinesHidden, true, 'CTA lines are folded');
-    assert.equal(layout.toolsOpen, false); assert.equal(layout.mapInClosedTools, true, 'the structure map is inside the folded episode tools');
+    assert.equal(layout.toolsOpen, false); assert.equal(layout.mapInClosedTools, false, 'the structure map is now at the top, not inside the folded tools');
     assert.equal(layout.keywordCountOnPage, 1, 'the keyword field exists once (moved, not duplicated)');
     const lastA = s.store.episodes.get(id).scenes.filter((x) => x.part !== 'B' && x.beatKey === 'product_bridge').pop();
     assert.ok(lastA, 'the fixture has a product bridge scene');
