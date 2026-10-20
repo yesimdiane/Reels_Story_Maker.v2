@@ -80,20 +80,19 @@ test('a scene cannot be approved while its dialogue does not fit — and scenes 
   }
 });
 
-test('the episode maximum video length is a hard limit: total over the max blocks script approval until scenes are shortened', async () => {
+test('the episode maximum video length is only a guide: going over warns but never blocks script approval', async () => {
   const m = await setup('drama', 60);
-  const ep = m.s.store.episodes.get(m.id);
   const total = m.s.episodeView(m.id).derived.totalPlannedSec;
-  assert.equal(m.s.episodeView(m.id).derived.validation.errors.some((e) => e.code === 'TOTAL_OVER_MAX'), false);
+  const codes = (v) => ({ err: v.errors.some((e) => e.code === 'TOTAL_OVER_MAX'), warn: v.warnings.some((w) => w.code === 'TOTAL_OVER_MAX') });
+  assert.deepEqual(codes(m.s.episodeView(m.id).derived.validation), { err: false, warn: false });
   await m.s.store.episodes.update(m.id, (e) => { e.maxDurationSec = Math.max(10, Math.floor(total) - 5); });
   const v = m.s.episodeView(m.id).derived.validation;
-  const e = v.errors.find((x) => x.code === 'TOTAL_OVER_MAX');
-  assert.ok(e); assert.match(e.message, /최대 영상 길이/);
-  await assert.rejects(approveWithScenes(m.s, m.id), (x) => x.code === 'INVALID_SCRIPT');
+  assert.deepEqual(codes(v), { err: false, warn: true }, 'a warning, not an error');
+  assert.match(v.warnings.find((x) => x.code === 'TOTAL_OVER_MAX').message, /권장 영상 길이/);
+  await approveWithScenes(m.s, m.id); // approval is not blocked
   assert.equal(m.s.episodeView(m.id).derived.totalPlannedSec, total, 'nothing was trimmed automatically');
   await m.s.store.episodes.update(m.id, (x) => { x.maxDurationSec = Math.ceil(total) + 1; });
-  assert.equal(m.s.episodeView(m.id).derived.validation.errors.some((x) => x.code === 'TOTAL_OVER_MAX'), false);
-  void ep;
+  assert.deepEqual(codes(m.s.episodeView(m.id).derived.validation), { err: false, warn: false });
 });
 
 test('every newly created episode category uses the six-beat story and reusable shopping ending', async () => {
