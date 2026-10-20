@@ -4,6 +4,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createApp } = require('../studio/server');
+const { gotoReady } = require('./helpers/route-ready');
 const { CONFIRM, setupProduct } = require('./helpers/product-analysis-fixtures');
 const { routePaid, conceptsForPrompt } = require('./helpers/v23');
 
@@ -24,8 +25,10 @@ test('story edit dialog: AI proposal fills the fields, the button is busy meanwh
   const page = await (await browser.newContext({ viewport: { width: 1280, height: 1100 } })).newPage();
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
   try {
-    await page.goto(`http://127.0.0.1:${app.address().port}/#/storylab/${pid}`);
+    await gotoReady(page, `http://127.0.0.1:${app.address().port}`, `storylab/${pid}`);
     await page.locator('[data-tab=approved]').click();
+    await page.waitForSelector('[data-story]');
+    await page.waitForTimeout(400); // let the list finish drawing before deciding whether the card is already open
     if (!(await page.locator('[data-story-open]').count())) await page.locator('[data-story]').first().click(); // actions live in the opened card
     await page.locator('[data-act=edit]').first().click();
     await page.waitForSelector('[data-refine-box]');
