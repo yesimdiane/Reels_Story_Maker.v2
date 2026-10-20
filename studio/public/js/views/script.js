@@ -1,7 +1,7 @@
 import { h, chip, icon, toast, confirmDialog } from '../ui.js';
 import { state, act, requireEpisode, refresh, hooks } from '../state.js';
 import { api } from '../api.js';
-import { pageHead, pipelineBar, noEpisode, episodePicker, confirmPaid } from './common.js';
+import { pipelineBar, noEpisode, episodePicker, confirmPaid } from './common.js';
 import { presetPanel } from './script-prompt.js';
 import { formulaLayout } from './script-formula.js';
 import { timingCard } from './script-timing.js';
@@ -67,7 +67,9 @@ export function script() {
   };
 
   const wrap = h('div', { class: 'stack script-studio', style: 'gap:14px' });
-  wrap.append(pageHead('Script Studio', '대본 스튜디오', 'PC에서는 S1부터 마지막 씬까지 모든 씬이 한 화면에 쌓여 보이고, 휴대폰에서는 한 번에 씬 하나씩 편집합니다. 씬 저장은 임시 저장이고, 씬 승인을 눌러야 승인됩니다.', episodePicker()));
+  const picker = episodePicker(); // the title / intro banner is gone; keep the episode switch
+  if (picker) wrap.append(h('div', { class: 'row', style: 'justify-content:flex-end' }, picker));
+  wrap.append(structureMap(ep, { dirty: () => d.dirty || d.epDirty })); // story map first: the whole episode at a glance
   wrap.append(assetStrip(ep));
   wrap.append(projectPanel(ep, d, errorSummary(ep, index, { onJump })));
   if (ep.derived.scriptChangedSinceApproval) wrap.append(h('div', { class: 'banner warn' }, h('div', null, h('b', null, '승인 후 대본이 수정되었습니다'), '유료 생성·음성·렌더가 잠겼습니다. 바뀐 씬을 다시 확인하고 승인하세요.')));
@@ -109,9 +111,9 @@ export function script() {
   }
   else { wrap.append(focus.el); wrap.append(ctaBox); }
   const tools = h('details', { class: 'card episode-tools', 'data-episode-tools': '1', open: !!(state.ui && state.ui.toolsOpen) },
-    h('summary', null, h('b', null, '에피소드 도구'), h('span', { class: 'small muted' }, ' 스토리 컨셉 · 프롬프트 · 대사 시간 · 구조도 · 제목 · 엔딩')),
+    h('summary', null, h('b', null, '에피소드 도구'), h('span', { class: 'small muted' }, ' 스토리 컨셉 · 프롬프트 · 대사 시간 · 제목 · 엔딩')),
     h('div', { class: 'stack', style: 'gap:14px;margin-top:12px' },
-      panelRow, structureMap(ep, { dirty: () => d.dirty || d.epDirty }), episodeCard,
+      panelRow, episodeCard,
       ep.formula.structured ? formulaLayout({ ep, d, blocks: [], dirty: dirtyEp, redrawAll: () => hooks.rerender(), v, index, addSceneIn: addSceneHere, dupScene: ctx.duplicateScene, focusScene }) : null,
       h('div', { class: 'row' }, epSave, d.epDirty ? h('span', { class: 'small', style: 'color:var(--clay)' }, '저장하지 않은 에피소드 설정이 있습니다') : null)));
   tools.addEventListener('toggle', () => { state.ui = state.ui || { open: {} }; state.ui.toolsOpen = tools.open; });

@@ -150,7 +150,7 @@ export function rerender() {
   try {
     if (state.episode && EP_HEADER_VIEWS.includes(state.view)) { const eh = episodeHeader(state.episode); if (eh) target.append(eh); }
     if (state.episode && EPISODE_VIEWS.includes(state.view)) target.append(episodeFlow(state.view, state.episode));
-    if (state.episode && EPISODE_VIEWS.includes(state.view)) { const approvals = studioApprovals(state.view, state.episode); if (approvals) target.append(approvals); }
+    if (state.episode && EPISODE_VIEWS.includes(state.view) && state.view !== 'script') { const approvals = studioApprovals(state.view, state.episode); if (approvals) target.append(approvals); }
     target.append(nav[3](state));
   } catch (e) {
     console.error(e);

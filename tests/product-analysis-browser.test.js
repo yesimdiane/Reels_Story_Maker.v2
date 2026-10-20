@@ -150,7 +150,6 @@ test('phone width: the analysis panel and the frame provenance fit without sidew
   try {
     await page.goto(`${base}/#/products/${pid}`);
     await page.waitForSelector(`[data-product-analysis="${pid}"]`, { state: 'attached' });
-    await page.locator('details[data-fold^="제품 구조 설명"] summary').click(); // approved already → folded by default
     await page.waitForSelector('[data-analysis-text]');
     await page.waitForTimeout(400);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1), true, 'product analysis overflows');

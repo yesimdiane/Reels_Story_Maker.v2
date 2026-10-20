@@ -28,8 +28,9 @@ export function regenPanel(ep, sc, ap, d) {
   if (!rec) return null;
   const cur = ep.lines.filter((l) => l.sceneId === sc.id);
   const p = rec.proposal;
+  const ko = (txt, key) => (txt ? h('div', { class: 'small muted', lang: 'ko', ['data-regen-' + key]: '' }, '한글 ' + txt) : null);
   const col = (title, t) => h('div', { class: 'regen-col stack', style: 'gap:6px' }, h('b', null, title),
-    h('div', { class: 'small' }, h('span', { class: 'muted' }, '제목 '), t.title_ko), h('div', { class: 'small' }, h('span', { class: 'muted' }, '시각 연출 '), t.visual || '—'), h('div', { class: 'small' }, h('span', { class: 'muted' }, '액션 '), t.action || '—'),
+    h('div', { class: 'small' }, h('span', { class: 'muted' }, '제목 '), t.title_ko), h('div', { class: 'small' }, h('span', { class: 'muted' }, '시각 연출 '), t.visual || '—'), ko(t.visual_ko, 'visual-ko'), h('div', { class: 'small' }, h('span', { class: 'muted' }, '액션 '), t.action || '—'), ko(t.action_ko, 'action-ko'),
     h('div', { class: 'small' }, h('span', { class: 'muted' }, '대사 '), (t.lines || []).length ? h('div', null, t.lines.map((l) => h('div', null, `${l.speaker}: ${l.en} / ${l.ko}`))) : '없음'));
   return h('div', { class: 'card flat stack regen-panel', style: 'gap:10px;border:1.5px solid var(--clay)', 'data-regen-panel': sc.id },
     h('div', { class: 'row between', style: 'flex-wrap:wrap;gap:6px' }, h('b', null, '재생성 제안 — 아직 적용·승인되지 않았습니다'), h('span', { class: 'row', style: 'gap:6px' }, chip('제안', 'attention'), rec.mock ? chip('샘플', 'mock') : null, ap && ap.approved ? chip(`현재 승인됨 r${ap.revision}`, 'done') : null)),
