@@ -49,7 +49,7 @@ export function castSection(pid, castState, onChange) {
         avatar(c), h('span', { class: 'cast-chip-name' }, c.name), !c.hasApprovedReference ? h('span', { class: 'cast-chip-warn', 'aria-label': '참조 이미지 없음' }, '참조 없음') : null);
     })) : null,
     h('div', { class: 'cast-foot' },
-    h('details', { class: 'small', 'data-guest': '' }, h('summary', { style: 'cursor:pointer;min-height:32px;display:flex;align-items:center' }, '게스트 · 내레이터' + (sel.guest || sel.narrator ? ' (사용 중)' : '')),
+    h('details', { class: 'small', 'data-guest': '', 'data-fold': '게스트 · 내레이터' }, h('summary', { style: 'cursor:pointer;min-height:32px;display:flex;align-items:center' }, '게스트 · 내레이터' + (sel.guest || sel.narrator ? ' (사용 중)' : '')),
       h('div', { class: 'stack', style: 'gap:8px;margin-top:6px' },
         h('label', { class: 'row small', style: 'gap:6px' }, h('input', { type: 'checkbox', checked: !!sel.narrator, 'data-narrator': '', onchange: (e) => save({ universeId: sel.universeId, characterIds: sel.characterIds, guest: sel.guest, narrator: e.target.checked }) }), '내레이터(보이스오버) 허용'),
         h('div', { class: 'grid two' },
