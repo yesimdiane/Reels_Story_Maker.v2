@@ -762,3 +762,9 @@ body.scene-dragging-body { cursor: grabbing; user-select: none; -webkit-user-sel
   .scene-card .scene-handle { opacity: 0; transition: opacity .15s; }
   .scene-card:hover .scene-handle, .scene-card:focus-within .scene-handle, .scene-handle:focus-visible, .scene-handle:active { opacity: 1; }
 }
+/* story-map chips: the state fills the whole chip, and the badge can never be pushed out by a long title */
+.scene-chip .chip-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scene-chip .tab-badge { flex: 0 0 auto; }
+.scene-chip.approved { background: var(--sage-deep); border-color: var(--sage-deep); color: #fff; }
+.scene-chip.approved .tab-badge.ok { background: #fff; color: var(--sage-deep); }
+.scene-chip.has-err { background: var(--rose-wash); border-color: var(--rose); }
