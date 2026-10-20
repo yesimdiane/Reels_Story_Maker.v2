@@ -9,7 +9,14 @@ const { defaultVars, VAR_KEYS } = require('./endingtemplates');
 const SCENE_FIELDS = ['title_ko', 'visual', 'action', 'narration', 'placement', 'durationSec', 'showsProduct'];
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-const endingVars = (ep) => Object.assign(defaultVars(ep.product, { neutral: !!(ep.universeId && ep.universeId !== 'jackdiane') }), (ep.ending && ep.ending.vars) || {});
+const endingVars = (ep) => {
+  const v = Object.assign(defaultVars(ep.product, { neutral: !!(ep.universeId && ep.universeId !== 'jackdiane') }), (ep.ending && ep.ending.vars) || {});
+  // the operator's short name beats whatever the AI proposed for the spoken product name (unless the operator typed that variable by hand)
+  const short = String((ep.product && ep.product.shortName) || '').trim();
+  const manual = (ep.ending && ep.ending.manualVars) || [];
+  if (short) ['PRODUCT_NAME', 'PRODUCT_NAME_KO'].forEach((k) => { if (!manual.includes(k)) v[k] = short; });
+  return v;
+};
 
 function freeIds(used, n, prefix) {
   const out = [];

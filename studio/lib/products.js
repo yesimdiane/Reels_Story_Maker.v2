@@ -181,7 +181,7 @@ function createProductService({ store, router, extractFn = extractProduct, downl
     const productCode = String(code || '').trim() ? checkCode(code) : '';
     if (fs.existsSync(fileOf(pid))) throw new StudioError('DUPLICATE', '이미 있는 상품 ID입니다: ' + pid, { status: 409 });
     const p = {
-      id: pid, name: String(name || '').trim().slice(0, 200), url: String(url || '').trim(), affiliateUrl: String(affiliateUrl || '').trim(), description: String(description || '').slice(0, 3000), category: String(category || '').slice(0, 100),
+      id: pid, name: String(name || '').trim().slice(0, 200), shortName: '', url: String(url || '').trim(), affiliateUrl: String(affiliateUrl || '').trim(), description: String(description || '').slice(0, 3000), category: String(category || '').slice(0, 100),
       specs: (features || []).map(String).map((t) => t.trim()).filter(Boolean).map((text) => ({ text, source: 'manual', verified: true, at: nowIso() })),
       sellingPoints: [], reviewResearch: { images: [], text: '', analysis: null, approved: false }, forbiddenClaims: (forbiddenClaims || []).map(String).filter(Boolean),
       price: cleanPrice(price), code: productCode, codeLockedAt: null, extraction: { status: 'none', note: '', at: '' }, images: [], referenceSet: null, legacy: !!legacy, createdAt: nowIso(), updatedAt: nowIso(),
@@ -201,6 +201,7 @@ function createProductService({ store, router, extractFn = extractProduct, downl
         }
       }
       ['name', 'category', 'description', 'url', 'affiliateUrl', 'referencePrompt'].forEach((k) => patch[k] !== undefined && (p[k] = String(patch[k]).trim().slice(0, ['description','referencePrompt'].includes(k) ? 3000 : 300)));
+      if (patch.shortName !== undefined) p.shortName = String(patch.shortName).trim().slice(0, 30); // spoken product name in the fixed ending (empty = use the full name)
       if (patch.url) require('./extract').parseUrl(patch.url);
       if (patch.price !== undefined) p.price = cleanPrice(patch.price);
       if (Array.isArray(patch.forbiddenClaims)) p.forbiddenClaims = patch.forbiddenClaims.map(String).filter(Boolean);
@@ -530,7 +531,7 @@ function createProductService({ store, router, extractFn = extractProduct, downl
         forbiddenClaims,
       },
       // 1. Product identity
-      identity: { productId: p.id, code: p.code || '', name: p.name, category: p.category || '', brand: p.brand || '', price: p.price || null },
+      identity: { productId: p.id, code: p.code || '', name: p.name, shortName: p.shortName || '', category: p.category || '', brand: p.brand || '', price: p.price || null },
       // 2. Verified facts
       verifiedFacts: facts,
       // 3-6. Visual lock, mechanism, hand scale, satisfaction (approved structure description)

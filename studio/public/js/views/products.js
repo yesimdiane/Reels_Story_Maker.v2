@@ -138,7 +138,7 @@ function draw(p) {
     h('div', { class: 'small' }, h('b', null, '연결된 에피소드: '), p.linkedEpisodes.length ? p.linkedEpisodes.map((e, i) => [i ? ', ' : '', h('a', { href: '#/script/' + e.id, onclick: () => { state.episodeId = e.id; } }, e.id)]) : '아직 없음 (스토리 승인 후 만들어집니다)')));
 
   // ---- A. info ----
-  const f = { price: (p.price && p.price.text) || '', name: p.name, category: p.category, url: p.url, affiliateUrl: p.affiliateUrl, description: p.description, forbidden: (p.forbiddenClaims || []).join(', '), specs: p.specs.map((s) => ({ text: s.text, verified: s.verified, source: s.source })), code: p.code || '' };
+  const f = { price: (p.price && p.price.text) || '', name: p.name, shortName: p.shortName || '', category: p.category, url: p.url, affiliateUrl: p.affiliateUrl, description: p.description, forbidden: (p.forbiddenClaims || []).join(', '), specs: p.specs.map((s) => ({ text: s.text, verified: s.verified, source: s.source })), code: p.code || '' };
   const ex = p.extraction || { status: 'none' };
   const specBox = h('div', { class: 'stack', style: 'gap:8px' });
   const drawSpecs = () => specBox.replaceChildren(...f.specs.map((s, i) => h('div', { class: 'row', style: 'flex-wrap:nowrap' },
@@ -151,6 +151,7 @@ function draw(p) {
     h('div', { class: 'card-head' }, h('h2', null, 'A · 제품 정보'), h('div', { class: 'row' }, chip(...EXTRACT_CHIP[ex.status] || EXTRACT_CHIP.none), h('button', { class: 'btn sm ghost', disabled: !p.url, onclick: () => run(() => api.post(`/api/products/${p.id}/extract`), 'URL 수집을 시도했습니다') }, icon('refresh'), 'URL에서 가져오기'))),
     ex.note ? h('div', { class: 'banner ' + (ex.status === 'ok' ? 'ok' : 'warn') }, h('div', null, ex.note, ex.imageFailures && ex.imageFailures.length ? h('div', { class: 'small' }, `이미지 ${ex.imageFailures.length}장은 가져오지 못했습니다.`) : null)) : null,
     h('div', { class: 'grid two' }, fld('제품 이름', f.name, (v) => (f.name = v)), fld('카테고리', f.category, (v) => (f.category = v)), fld('제품 URL', f.url, (v) => (f.url = v)), fld('쿠팡 파트너스(제휴) 링크', f.affiliateUrl, (v) => (f.affiliateUrl = v))),
+    h('div', { class: 'field', 'data-product-short-name': '' }, h('label', null, '엔딩 대사용 짧은 이름 (선택)'), h('input', { type: 'text', value: f.shortName, maxlength: 30, placeholder: '예: 배수구 필터', 'aria-label': '엔딩 대사용 짧은 이름', oninput: (e) => (f.shortName = e.target.value) }), h('div', { class: 'small muted' }, '고정 엔딩 대사(5초 컷)에서 말하는 제품 이름입니다. 쿠팡 상품명이 길면 대사가 5초를 넘어 승인이 막히니, 짧게 적어 두세요. 비워 두면 제품 이름 전체를 씁니다. 새로 만드는 에피소드부터 적용됩니다.')),
     h('div', { class: 'field', 'data-product-code': '' }, h('label', null, '제품 코드 (에피소드 ID의 앞부분 · 예: UMB-01-D)'),
       h('div', { class: 'row', style: 'flex-wrap:nowrap' },
         h('input', { type: 'text', value: f.code, maxlength: 5, placeholder: p.suggestedCode || 'UMB', disabled: !!p.codeLocked, autocapitalize: 'characters', 'aria-label': '제품 코드', style: 'width:110px;text-transform:uppercase', oninput: (e) => (f.code = e.target.value.toUpperCase()) }),
@@ -160,7 +161,7 @@ function draw(p) {
     h('div', { class: 'field' }, h('label', null, '제품 설명'), h('textarea', { rows: 2, oninput: (e) => (f.description = e.target.value) }, f.description)),
     h('div', { class: 'field' }, h('label', null, '확인된 기능·사양 — "확인됨"으로 표시된 것만 스토리 생성에 사용됩니다'), specBox),
     fld('금지 표현 (쉼표로 구분 — 영상/대본에서 쓰면 안 되는 제품 주장)', f.forbidden, (v) => (f.forbidden = v)),
-    h('div', { class: 'row end' }, h('button', { class: 'btn', onclick: () => run(() => api.put('/api/products/' + p.id, { code: f.code, price: { text: f.price }, name: f.name, category: f.category, url: f.url, affiliateUrl: f.affiliateUrl, description: f.description, specs: f.specs, forbiddenClaims: f.forbidden.split(',').map((x) => x.trim()).filter(Boolean) }), '저장했습니다') }, '저장')),
+    h('div', { class: 'row end' }, h('button', { class: 'btn', onclick: () => run(() => api.put('/api/products/' + p.id, { code: f.code, price: { text: f.price }, name: f.name, shortName: f.shortName, category: f.category, url: f.url, affiliateUrl: f.affiliateUrl, description: f.description, specs: f.specs, forbiddenClaims: f.forbidden.split(',').map((x) => x.trim()).filter(Boolean) }), '저장했습니다') }, '저장')),
     p.url ? h('p', { class: 'small muted', style: 'margin:0' }, '출처 URL: ' + p.url + ' · 가격·할인·평점은 수집하지 않으며 제품 사실은 직접 확인한 것만 사용합니다.') : null));
 
   // ---- Customer-review research (separate from product reference images) ----

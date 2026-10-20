@@ -61,7 +61,7 @@ function createScriptGen({ store, products, storylab, episodeIds, prompts, prese
     const seed = {
       id: epId, reelId: epId, productId: pid, title: concept.title, titleEn: '', series: rc.universe.name, universeId: rc.universe.id,
       cast: { universeId: rc.universe.id, characterIds: rc.ids, guest: rc.cast.guest, narrator: rc.cast.narrator, approvedExtras: extras },
-      product: { id: pid, name: p.name, kind: p.category || '', verifiedFeatures: b.facts, verifiedBehavior: (b.visualStructure && b.visualStructure.verifiedBehavior) || [], forbiddenClaims: p.forbiddenClaims || [], affiliateUrl: p.affiliateUrl || '', visualSummary: p.description || '', sourceNote: '운영자가 확인한 사실만 사용합니다 (Products 화면).' },
+      product: { id: pid, name: p.name, shortName: p.shortName || '', kind: p.category || '', verifiedFeatures: b.facts, verifiedBehavior: (b.visualStructure && b.visualStructure.verifiedBehavior) || [], forbiddenClaims: p.forbiddenClaims || [], affiliateUrl: p.affiliateUrl || '', visualSummary: p.description || '', sourceNote: '운영자가 확인한 사실만 사용합니다 (Products 화면).' },
       characters: rc.ids.concat(extras), beats: [],
       scenes: [], lines: [], suggestions: [],
       cta: { lines: [], durationSec: 3.5, keyword: '' },
@@ -122,6 +122,8 @@ function createScriptGen({ store, products, storylab, episodeIds, prompts, prese
     lines.push('CURRENT_ENDING_VARS: ' + JSON.stringify(v));
     // the ending's fixed lines already use most of each shot's time: keep the product-specific words short so the shots still fit
     const demo = (ep.scenes.find((x) => x.beatKey === 'product_demonstration') || {}).durationSec || 5;
+    const shortName = String((ep.product && ep.product.shortName) || '').trim();
+    if (shortName) lines.push(`OPERATOR_SHORT_NAME: "${shortName}" — the operator chose this as the spoken product name: use it for PRODUCT_NAME and PRODUCT_NAME_KO exactly.`);
     lines.push(`ENDING_TIMING: keep PRODUCT_NAME and USE_PHRASE to at most 3 words each, and DEMO_LINE_EN to at most ${Math.min(8, wordBudget(demo, 1))} words (the demo shot lasts ${demo} s). Shorter is better.`);
     return lines;
   }
