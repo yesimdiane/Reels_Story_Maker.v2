@@ -89,6 +89,20 @@ export async function addScene(ep, d, ctx, beatKey, afterSid) {
   } catch (e) { toast(e.message, { error: true, recovery: e.recovery }); }
 }
 
+export async function duplicateScene(ep, d, ctx, sid) {
+  const go = await guardLeave({ dirty: isDirty(d), what: '씬을 복제하기 전에', save: async () => saveAllDirty(ep, d, ctx) });
+  if (!go) return;
+  try {
+    const r = await api.post(`/api/episodes/${ep.id}/scenes/${sid}/duplicate`);
+    setFocus(ep, r.newSceneId);
+    state.draft.script = null;
+    state.episode = r;
+    toast(`${sid} 씬을 복제해 ${r.newSceneId} 씬을 만들었습니다 (미승인 상태 — 검토 후 승인하세요)`);
+    await refresh();
+    await hooks.rerender();
+  } catch (e) { toast(e.message, { error: true, recovery: e.recovery }); }
+}
+
 /** 씬 승인: save the current edits as a draft, then validate and approve ONLY this scene. On failure: open + scroll to + highlight the invalid field. */
 export async function approveCurrentScene(ep, d, sid) {
   try {
@@ -299,7 +313,8 @@ export function sceneFocus(ep, d, ctx, sceneId, { inline = false } = {}) {
     h('div', { class: 'scene-head' },
       h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap;min-width:0' }, canMove(ep, sid) ? dragHandle(sid) : null, h('span', { class: 'scene-no eyebrow' }, `씬 ${idxOf + 1}`), h('span', { class: 'small muted' }, sid), statusChip(ap),
         ap && ap.approved ? h('button', { class: 'btn sm ghost', type: 'button', 'data-scene-collapse': sid, onclick: () => { setCollapsed(ep.id, sid, true); hooks.rerender(); } }, '접기') : null),
-      h('button', { class: 'btn sm clay', type: 'button', 'data-add-scene': sid, title: '현재 씬 바로 뒤에 새 씬을 만듭니다 (기존 씬은 바뀌지 않습니다)', onclick: () => ctx.addScene(sid) }, icon('plus'), '씬 추가')),
+      h('div', { class: 'row', style: 'gap:6px' }, sc.part !== 'B' ? h('button', { class: 'btn sm ghost', type: 'button', 'data-dup-scene': sid, title: '이 씬을 그대로 복사해 바로 뒤에 미승인 상태로 만듭니다', onclick: () => ctx.duplicateScene(sid) }, '⎘ 씬 복제') : null,
+      h('button', { class: 'btn sm clay', type: 'button', 'data-add-scene': sid, title: '현재 씬 바로 뒤에 새 씬을 만듭니다 (기존 씬은 바뀌지 않습니다)', onclick: () => ctx.addScene(sid) }, icon('plus'), '씬 추가'))),
     attach(index, h('div', { class: 'field', style: 'margin:0' }, h('input', { type: 'text', class: 'scene-title', value: sc.title_ko, placeholder: sc.legacyTitle ? '한국어 제목 입력 (현재: ' + sc.legacyTitle + ')' : '한국어 장면 제목 (예: 영국인의 자신감)', maxLength: 24, 'aria-label': '장면 제목 (한국어)', oninput: (e) => { sc.title_ko = e.target.value; dirty(); } })), `S:${sid}:title_ko`),
     h('div', { class: 'scene-summary' }, h('div', { class: 'scene-summary-text' }, desc, dlgSummary,
       chipRow)),

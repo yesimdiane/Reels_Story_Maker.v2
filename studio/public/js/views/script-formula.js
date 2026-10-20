@@ -38,7 +38,7 @@ export async function runFormulaAction(ep, action, { extra = '' } = {}) {
   // act() swallows the error into a toast; re-check the state to see whether a protected overwrite is needed
 }
 
-export function formulaLayout({ ep, d, blocks, dirty, redrawAll, v, index, addSceneIn, focusScene }) {
+export function formulaLayout({ ep, d, blocks, dirty, redrawAll, v, index, addSceneIn, dupScene, focusScene }) {
   const F = ep.formula;
   const fx = ep.formula.ending;
   const root = h('div', { class: 'stack', style: 'gap:22px' });
@@ -111,7 +111,7 @@ export function formulaLayout({ ep, d, blocks, dirty, redrawAll, v, index, addSc
     card.append(h('div', { class: 'grid two' }, field('이야기 설명 (English) — 직접 쓰면 AI가 그대로 살립니다', bd.story_en, (x) => (bd.story_en = x), { rows: 2, lang: 'en' }), field('비주얼 방향', bd.visual, (x) => (bd.visual = x), { rows: 2 })));
     b.sceneIds.forEach((id) => { const bl = blockOf(id); if (bl) card.append(bl); });
     if (focusScene) card.append(sceneLinks(b.sceneIds));
-    card.append(h('div', { class: 'row' }, h('button', { class: 'btn sm ghost', type: 'button', onclick: () => addSceneIn && addSceneIn(b.key) }, icon('plus'), '이 단계에 씬 추가')));
+    card.append(h('div', { class: 'row' }, h('button', { class: 'btn sm ghost', type: 'button', onclick: () => addSceneIn && addSceneIn(b.key) }, icon('plus'), '이 단계에 씬 추가'), b.sceneIds.length && dupScene ? h('button', { class: 'btn sm ghost', type: 'button', 'data-dup-beat': b.key, title: '이 단계의 마지막 씬을 그대로 복사해 바로 뒤에 미승인 상태로 만듭니다', onclick: () => dupScene(b.sceneIds[b.sceneIds.length - 1]) }, '⎘ 씬 복제') : null));
     root.append(card);
   });
 
