@@ -325,6 +325,7 @@ function createApp(studio, { token = '', port = 0, host = '127.0.0.1', log = () 
   route('POST', '/api/episodes/:id/script-versions/:n/undelete', async ({ p }) => S.undeleteScriptVersion(p.id, Number(p.n)));
   route('POST', '/api/episodes/:id/restore', async ({ p }) => S.restoreEpisode(p.id));
   route('POST', '/api/episodes/:id/scenes', async ({ p, body }) => S.addScene(p.id, { afterSceneId: body.afterSceneId, beatKey: body.beatKey }));
+  route('POST', '/api/episodes/:id/scenes/:sid/duplicate', async ({ p }) => S.duplicateScene(p.id, p.sid));
   route('DELETE', '/api/episodes/:id/scenes/:sid', async ({ p }) => S.deleteScene(p.id, p.sid));
   route('PUT', '/api/episodes/:id/scenes/:sid', async ({ p, body }) => S.saveScene(p.id, p.sid, { scene: body.scene, lines: body.lines }));
   route('POST', '/api/episodes/:id/scenes/reorder', async ({ p, body }) => S.reorderScenes(p.id, { beats: body.beats, order: body.order }));

@@ -1073,6 +1073,42 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
     return v;
   }
 
+  /** 씬 복제: copies one scene (narration / visual / action / characters / dialogue) right after itself as a NEW, unapproved scene. Clips, images, prompts and approvals are never copied. */
+  async function duplicateScene(id, sceneId, by = 'operator') {
+    let newId = '';
+    await store.episodes.update(id, (ep) => {
+      const src = ep.scenes.find((x) => x.id === sceneId);
+      if (!src) throw new StudioError('NOT_FOUND', '장면을 찾을 수 없습니다: ' + sceneId, { status: 404 });
+      if (F.isStructured(ep) && src.part === 'B') throw new StudioError('ENDING_LOCKED', '고정 제품 엔딩 컷은 복제할 수 없습니다.', { status: 409 });
+      const used = new Set(ep.scenes.map((s) => s.id).concat(Object.keys(ep.clips || {}), Object.keys(ep.prompts || {}), Object.keys(ep.sceneApprovals || {})));
+      let n = ep.scenes.length + 1;
+      while (used.has('S' + n)) n += 1;
+      newId = 'S' + n;
+      const strip = (t) => String(t || '').replace(/\s*\((컷 \d+|복제본)\)$/, '');
+      const base = strip(src.title_ko);
+      const cuts = ep.scenes.filter((s) => strip(s.title_ko) === base).length;
+      const suffix = ` (컷 ${cuts + 1})`;
+      const title_ko = (base.slice(0, Math.max(0, 24 - suffix.length)) + suffix).trim();
+      const sc = JSON.parse(JSON.stringify(src));
+      delete sc.startImage; delete sc.origin;
+      Object.assign(sc, { id: newId, title_ko, title: title_ko, manualEdit: true });
+      const idx = ep.scenes.indexOf(src) + 1;
+      ep.scenes.splice(idx, 0, sc);
+      const ids = new Set(ep.lines.map((l) => l.id));
+      let k = ep.lines.length + 1;
+      const at = ep.lines.reduce((m, l, i) => (l.sceneId === sceneId ? i : m), ep.lines.length - 1);
+      const copies = ep.lines.filter((l) => l.sceneId === sceneId).map((l) => { while (ids.has('L' + k)) k += 1; ids.add('L' + k); return { id: 'L' + k, sceneId: newId, speaker: l.speaker, en: l.en, ko: l.ko, edited: true }; });
+      ep.lines.splice(at + 1, 0, ...copies);
+      const nxt = ep.scenes[idx + 1];
+      if (nxt && ep.prompts[nxt.id]) ep.prompts[nxt.id].stale = true;
+      if (F.isStructured(ep)) F.syncBeats(ep);
+    }, { snapshot: true, by, note: `씬 복제 (${sceneId})` });
+    store.episodes.audit(id, 'scene.duplicated', { sceneId, newSceneId: newId, by });
+    const v = episodeView(id);
+    v.newSceneId = newId;
+    return v;
+  }
+
   /** Removes one scene and its dialogue. Clips, images, prompts and the approval history stay on disk (nothing is deleted). The fixed ending and the last scene of a story beat cannot be removed. */
   async function deleteScene(id, sceneId, by = 'operator') {
     await store.episodes.update(id, (ep) => {
@@ -1598,7 +1634,7 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
   return {
     exportName, sceneFlow, animGate, lipsync, uploadMusic, videoEdit, sfx, cfg, characterView, aiDiagnostics, store, video, gen, startImages, productAnalysis, charRefs, brollImages, animplan, renderReadiness, presets, endings, voice, renderer, publishing, vault: keys, runtime, usage, prompts, router, products, storylab, universes, sceneRegen, voiceCatalog, scriptgen, integrations, createEpisodeFromConcept, migrateLegacy, projects, translator, cutPresets, saveInserts, cutFrame,
     saveOutfitLock, summary, episodeView, episodeIds, sba, performance, manychat, setEpisodeCategory, holdEpisode, resumeEpisode, assertNotHeld, editEpisode, providerStatus, createEpisode, saveScript, approveScript, revokeScript, restoreVersion, addSuggestion,
-    rebuildPrompts, savePrompt, setSceneTitle, reorderScenes, saveScene, addScene, deleteScene, trashEpisode, restoreEpisode, trashList, archiveEpisode, unarchiveEpisode, episodeImpact, scriptVersions, deleteScriptVersion, undeleteScriptVersion, reuseEndingAssets, setStartImage, uploadStartFrame, approveStartFrame, deleteStartFrame, saveImagePrompt, resetImagePrompt, approveStoryboard, revokeStoryboard, saveAnimationSettings, addCustomModel, removeCustomModel, confirmModel, muapiCliModels, confirmMuapiTts, muapiCheck, setSpendLimit,
+    rebuildPrompts, savePrompt, setSceneTitle, reorderScenes, saveScene, addScene, duplicateScene, deleteScene, trashEpisode, restoreEpisode, trashList, archiveEpisode, unarchiveEpisode, episodeImpact, scriptVersions, deleteScriptVersion, undeleteScriptVersion, reuseEndingAssets, setStartImage, uploadStartFrame, approveStartFrame, deleteStartFrame, saveImagePrompt, resetImagePrompt, approveStoryboard, revokeStoryboard, saveAnimationSettings, addCustomModel, removeCustomModel, confirmModel, muapiCliModels, confirmMuapiTts, muapiCheck, setSpendLimit,
     updateCharacter, characterView, promptStatus: promptSvc.status, saveSettings, loadDemoReferences, uploadSfx, updateSfx, mediaFile,
   };
 }

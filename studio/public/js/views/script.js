@@ -10,7 +10,7 @@ import { structureMap } from './structure-map.js';
 import { planStep, planReorder } from '../scene-order-core.js';
 import { announce } from './scene-dnd.js';
 import { projectPanel } from './script-project.js';
-import { sceneFocus, sceneNavigator, currentSceneId, setFocus, switchScene, addScene, saveAllDirty } from './script-focus.js';
+import { sceneFocus, sceneNavigator, currentSceneId, setFocus, switchScene, addScene, duplicateScene, saveAllDirty } from './script-focus.js';
 import { guardLeave } from './leave-guard.js';
 import { versionMenu, versionManager } from './episode-actions.js';
 import { draftOf } from './script-draft.js';
@@ -50,6 +50,7 @@ export function script() {
   ctx.moveScene = (sid0, delta) => reorderWith(ep, d, planStep(ep, sid0, delta), sid0);
   ctx.dropScene = (sid0, toIndex) => reorderWith(ep, d, planReorder(ep, sid0, toIndex), sid0);
   const addSceneHere = (beatKey) => addScene(ep, d, ctx, beatKey);
+  ctx.duplicateScene = (sid) => duplicateScene(ep, d, ctx, sid);
   ctx.addScene = (afterSid) => addScene(ep, d, ctx, undefined, afterSid);
   const wide = WIDE.matches;
   const focusScene = (id) => switchScene(ep, d, id, ctx);
@@ -111,7 +112,7 @@ export function script() {
     h('summary', null, h('b', null, '에피소드 도구'), h('span', { class: 'small muted' }, ' 스토리 컨셉 · 프롬프트 · 대사 시간 · 구조도 · 제목 · 엔딩')),
     h('div', { class: 'stack', style: 'gap:14px;margin-top:12px' },
       panelRow, structureMap(ep, { dirty: () => d.dirty || d.epDirty }), episodeCard,
-      ep.formula.structured ? formulaLayout({ ep, d, blocks: [], dirty: dirtyEp, redrawAll: () => hooks.rerender(), v, index, addSceneIn: addSceneHere, focusScene }) : null,
+      ep.formula.structured ? formulaLayout({ ep, d, blocks: [], dirty: dirtyEp, redrawAll: () => hooks.rerender(), v, index, addSceneIn: addSceneHere, dupScene: ctx.duplicateScene, focusScene }) : null,
       h('div', { class: 'row' }, epSave, d.epDirty ? h('span', { class: 'small', style: 'color:var(--clay)' }, '저장하지 않은 에피소드 설정이 있습니다') : null)));
   tools.addEventListener('toggle', () => { state.ui = state.ui || { open: {} }; state.ui.toolsOpen = tools.open; });
   wrap.append(tools);

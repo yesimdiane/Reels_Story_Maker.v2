@@ -26,7 +26,7 @@ export const EN = {
   'AI로 코미디 스토리 만들기 (PART A)': 'Generate comedy story with AI (PART A)', 'AI로 코미디 스토리 다시 만들기 (PART A)': 'Regenerate comedy story with AI (PART A)',
   'AI로 프롬프트 만들기': 'Generate prompts with AI', '초안 다시 만들기': 'Rebuild draft', '다시 만들기': 'Rebuild', '다시 생성': 'Regenerate',
   '대사 추가': 'Add line', '대사 삭제': 'Delete line', '대사 줄이기 (AI)': 'Shorten lines (AI)', '씬 저장': 'Save scene', '장면 저장': 'Save scene', '씬 승인': 'Approve scene', '씬 승인 취소': 'Revoke scene approval',
-  '씬 추가': 'Add scene', '이 씬 삭제': 'Delete this scene', '이 단계에 씬 추가': 'Add scene to this step', '템플릿에서 씬 추가': 'Add scene from template',
+  '씬 추가': 'Add scene', '⎘ 씬 복제': 'Duplicate scene', '이 씬 삭제': 'Delete this scene', '이 단계에 씬 추가': 'Add scene to this step', '템플릿에서 씬 추가': 'Add scene from template',
   '← 이전 씬': '← Previous scene', '다음 씬 →': 'Next scene →', '변경 저장': 'Save changes', '저장 (새 버전)': 'Save (new version)', '새 버전으로 저장': 'Save as new version',
   '저장하고 계속 (승인은 되지 않습니다)': 'Save and continue (not approved)', '저장하지 않고 계속': 'Continue without saving',
   '+ 컷 추가': '+ Add cut', '컷 추가': 'Add cut', '컷 편집': 'Edit cut', '이 컷 삭제': 'Delete this cut',
