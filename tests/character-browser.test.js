@@ -51,8 +51,7 @@ test('Story Lab: compact universe dropdown + character chips, multi-select, narr
       await sel.selectOption('gregory-cats');
       await page.waitForFunction(() => document.querySelectorAll('[data-character]').length === 3);
       assert.deepEqual(s.storylab.castState(pid).characterIds, ['cloud', 'lucy'], 'previous selection restored');
-      // a re-render triggered by the selects above can swap the fold closed again; keep opening it until the box is really visible
-      await page.waitForFunction(() => { const d = document.querySelector('[data-guest]'); if (!d) return false; if (!d.open) d.open = true; const n = d.querySelector('[data-narrator]'); return !!n && n.offsetParent !== null; });
+      await page.locator('[data-guest] summary').click();
       await page.locator('[data-narrator]').check();
       await page.waitForFunction(() => !!((document.querySelector('[data-narrator]') || {}).checked));
       assert.equal(s.storylab.castState(pid).cast.narrator, true);
