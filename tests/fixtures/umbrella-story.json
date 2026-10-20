@@ -1,184 +1,174 @@
 {
- "title": "우산 거부자의 비극",
- "comedy_story": {
-  "setup": {
-   "title_ko": "영국인의 자신감",
-   "story_en": "Jack confidently refuses an umbrella while walking in Gangnam.",
-   "visual": "Jack strides through busy Gangnam under a darkening sky, waving off Diane's umbrella.",
-   "scenes": [
-    {
-     "title_ko": "영국인의 자신감",
-     "durationSec": 4,
-     "characters": [
-      "jack",
-      "diane"
-     ],
-     "showsProduct": false,
-     "visual": "Jack walking in Gangnam, dark clouds behind him, Diane holding out an umbrella.",
-     "action": "Jack waves the umbrella away with a smug grin.",
-     "narration": "",
-     "placement": "",
-     "lines": [
-      {
-       "speaker": "diane",
-       "en": "Baby, umbrella!",
-       "ko": "자기야, 우산!"
-      },
-      {
-       "speaker": "jack",
-       "en": "I'm British. Rain loves me.",
-       "ko": "난 영국인이야. 비가 날 좋아해."
-      }
-     ]
+  "title": "우산 거부자의 비극",
+  "comedy_story": {
+    "setup": {
+      "title_ko": "영국인의 자신감",
+      "story_en": "Jack confidently refuses an umbrella while walking in Gangnam.",
+      "visual": "Jack strides through busy Gangnam under a darkening sky, waving off Diane's umbrella.",
+      "scenes": [
+        {
+          "title_ko": "영국인의 자신감",
+          "durationSec": 4,
+          "characters": [
+            "jack",
+            "diane"
+          ],
+          "showsProduct": false,
+          "visual": "Jack walking in Gangnam, dark clouds behind him, Diane holding out an umbrella.",
+          "action": "Jack waves the umbrella away with a smug grin.",
+          "narration": "",
+          "placement": "",
+          "lines": [
+            {
+              "speaker": "diane",
+              "en": "Baby, umbrella!",
+              "ko": "자기야, 우산!"
+            },
+            {
+              "speaker": "jack",
+              "en": "I'm British. Rain loves me.",
+              "ko": "난 영국인이야. 비가 날 좋아해."
+            }
+          ]
+        }
+      ]
+    },
+    "problem": {
+      "title_ko": "괴물 장마 개시",
+      "story_en": "An absurd Korean monsoon begins.",
+      "visual": "Sky-high wall of rain slams into Gangnam; streets flood in seconds.",
+      "scenes": [
+        {
+          "title_ko": "괴물 장마 개시",
+          "durationSec": 4,
+          "characters": [
+            "jack"
+          ],
+          "showsProduct": false,
+          "visual": "A sudden absurd monsoon hits Gangnam, raindrops the size of fists.",
+          "action": "Jack is pelted and keeps walking, pretending it's nothing.",
+          "narration": "",
+          "placement": "",
+          "lines": [
+            {
+              "speaker": "jack",
+              "en": "Just a drizzle.",
+              "ko": "보슬비네."
+            }
+          ]
+        }
+      ]
+    },
+    "absurd_escalation": {
+      "title_ko": "서울이 잠긴 날",
+      "story_en": "The flooding becomes a cartoon-scale tsunami.",
+      "visual": "A cartoon tsunami towers over the skyscrapers of Seoul with Jack tiny in front of it.",
+      "scenes": [
+        {
+          "title_ko": "서울이 잠긴 날",
+          "durationSec": 5,
+          "characters": [
+            "jack"
+          ],
+          "showsProduct": false,
+          "visual": "A towering cartoon tsunami over Gangnam's skyline.",
+          "action": "Jack looks up at the wave and gulps.",
+          "narration": "",
+          "placement": "",
+          "lines": [
+            {
+              "speaker": "jack",
+              "en": "...Still drizzle.",
+              "ko": "...그래도 보슬비야."
+            }
+          ]
+        }
+      ]
+    },
+    "unexpected_twist": {
+      "title_ko": "출근길의 보트",
+      "story_en": "Korean commuters are still going to work normally, including someone casually commuting by boat.",
+      "visual": "Office workers wade past calmly with briefcases; a man rows a small boat down the flooded street.",
+      "scenes": [
+        {
+          "title_ko": "출근길의 보트",
+          "durationSec": 4,
+          "characters": [
+            "jack"
+          ],
+          "showsProduct": false,
+          "visual": "Commuters walk to work through the flood; one man casually paddles a boat.",
+          "action": "The boat commuter nods politely at Jack.",
+          "narration": "",
+          "placement": "",
+          "lines": [
+            {
+              "speaker": "jack",
+              "en": "Nobody's bothered?!",
+              "ko": "아무도 신경 안 써?!"
+            }
+          ]
+        }
+      ]
+    },
+    "resolution": {
+      "title_ko": "물에 빠진 생쥐",
+      "story_en": "Jack reaches their hilltop home completely soaked.",
+      "visual": "Jack, drenched, trudges up the hill to their home.",
+      "scenes": [
+        {
+          "title_ko": "물에 빠진 생쥐",
+          "durationSec": 4,
+          "characters": [
+            "jack"
+          ],
+          "showsProduct": false,
+          "visual": "Jack climbs the hill to the house, completely soaked.",
+          "action": "Jack arrives at the door dripping like a wet mouse.",
+          "narration": "",
+          "placement": "",
+          "lines": [
+            {
+              "speaker": "jack",
+              "en": "I made it.",
+              "ko": "해냈어."
+            }
+          ]
+        }
+      ]
+    },
+    "product_bridge": {
+      "title_ko": "현관 출입 금지",
+      "story_en": "Jack is a walking puddle. Diane refuses to let him drip water inside and throws him a towel.",
+      "visual": "Diane blocks the doorway and tosses a towel at the puddle that is Jack.",
+      "scenes": [
+        {
+          "title_ko": "현관 출입 금지",
+          "durationSec": 5,
+          "characters": [
+            "diane"
+          ],
+          "showsProduct": true,
+          "visual": "Diane at the door, Jack a walking puddle on the doorstep.",
+          "action": "Diane throws a towel and points at the floor.",
+          "narration": "",
+          "placement": "",
+          "lines": [
+            {
+              "speaker": "diane",
+              "en": "Stop! Not one drop inside! Towel!",
+              "ko": "거기 서! 한 방울도 안 돼! 수건!"
+            }
+          ]
+        }
+      ]
     }
-   ]
   },
-  "problem": {
-   "title_ko": "괴물 장마 개시",
-   "story_en": "An absurd Korean monsoon begins.",
-   "visual": "Sky-high wall of rain slams into Gangnam; streets flood in seconds.",
-   "scenes": [
-    {
-     "title_ko": "괴물 장마 개시",
-     "durationSec": 4,
-     "characters": [
-      "jack"
-     ],
-     "showsProduct": false,
-     "visual": "A sudden absurd monsoon hits Gangnam, raindrops the size of fists.",
-     "action": "Jack is pelted and keeps walking, pretending it's nothing.",
-     "narration": "",
-     "placement": "",
-     "lines": [
-      {
-       "speaker": "jack",
-       "en": "Just a drizzle.",
-       "ko": "보슬비네."
-      }
-     ]
-    }
-   ]
-  },
-  "absurd_escalation": {
-   "title_ko": "서울이 잠긴 날",
-   "story_en": "The flooding becomes a cartoon-scale tsunami.",
-   "visual": "A cartoon tsunami towers over the skyscrapers of Seoul with Jack tiny in front of it.",
-   "scenes": [
-    {
-     "title_ko": "서울이 잠긴 날",
-     "durationSec": 5,
-     "characters": [
-      "jack"
-     ],
-     "showsProduct": false,
-     "visual": "A towering cartoon tsunami over Gangnam's skyline.",
-     "action": "Jack looks up at the wave and gulps.",
-     "narration": "",
-     "placement": "",
-     "lines": [
-      {
-       "speaker": "jack",
-       "en": "...Still drizzle.",
-       "ko": "...그래도 보슬비야."
-      }
-     ]
-    }
-   ]
-  },
-  "unexpected_twist": {
-   "title_ko": "출근길의 보트",
-   "story_en": "Korean commuters are still going to work normally, including someone casually commuting by boat.",
-   "visual": "Office workers wade past calmly with briefcases; a man rows a small boat down the flooded street.",
-   "scenes": [
-    {
-     "title_ko": "출근길의 보트",
-     "durationSec": 4,
-     "characters": [
-      "jack"
-     ],
-     "showsProduct": false,
-     "visual": "Commuters walk to work through the flood; one man casually paddles a boat.",
-     "action": "The boat commuter nods politely at Jack.",
-     "narration": "",
-     "placement": "",
-     "lines": [
-      {
-       "speaker": "jack",
-       "en": "Nobody's bothered?!",
-       "ko": "아무도 신경 안 써?!"
-      }
-     ]
-    }
-   ]
-  },
-  "resolution": {
-   "title_ko": "물에 빠진 생쥐",
-   "story_en": "Jack reaches their hilltop home completely soaked.",
-   "visual": "Jack, drenched, trudges up the hill to their home.",
-   "scenes": [
-    {
-     "title_ko": "물에 빠진 생쥐",
-     "durationSec": 4,
-     "characters": [
-      "jack"
-     ],
-     "showsProduct": false,
-     "visual": "Jack climbs the hill to the house, completely soaked.",
-     "action": "Jack arrives at the door dripping like a wet mouse.",
-     "narration": "",
-     "placement": "",
-     "lines": [
-      {
-       "speaker": "jack",
-       "en": "I made it.",
-       "ko": "해냈어."
-      }
-     ]
-    }
-   ]
-  },
-  "product_bridge": {
-   "title_ko": "현관 출입 금지",
-   "story_en": "Jack is a walking puddle. Diane refuses to let him drip water inside and throws him a towel.",
-   "visual": "Diane blocks the doorway and tosses a towel at the puddle that is Jack.",
-   "scenes": [
-    {
-     "title_ko": "현관 출입 금지",
-     "durationSec": 5,
-     "characters": [
-      "diane"
-     ],
-     "showsProduct": false,
-     "visual": "Diane at the door, Jack a walking puddle on the doorstep.",
-     "action": "Diane throws a towel and points at the floor.",
-     "narration": "",
-     "placement": "",
-     "lines": [
-      {
-       "speaker": "diane",
-       "en": "Stop! Not one drop inside! Towel!",
-       "ko": "거기 서! 한 방울도 안 돼! 수건!"
-      }
-     ]
-    }
-   ]
+  "cta": {
+    "lines": [
+      "댓글에 '우산' 남기면 링크 드림!"
+    ],
+    "keyword": "우산",
+    "durationSec": 3.5
   }
- },
- "ending_vars": {
-  "PRODUCT_NAME": "magnetic umbrella holder",
-  "PRODUCT_NAME_KO": "자석 우산꽂이",
-  "USE_PHRASE": "an umbrella",
-  "USE_PHRASE_KO": "우산을",
-  "DEMO_ACTION": "Diane sticks the magnetic umbrella holder to the inside of the front door and hangs a wet umbrella on it.",
-  "DEMO_ACTION_KO": "자석 우산꽂이를 현관문 안쪽에 붙이고 우산을 건다",
-  "DEMO_LINE_EN": "It just sticks to the door!",
-  "DEMO_LINE_KO": "문에 딱 붙어!"
- },
- "cta": {
-  "lines": [
-   "댓글에 '우산' 남기면 링크 드림!"
-  ],
-  "keyword": "우산",
-  "durationSec": 3.5
- }
 }

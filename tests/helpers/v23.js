@@ -45,7 +45,6 @@ function scriptResponse(req, { story = umbrellaStory, beat } = {}) {
   const t = /TARGET_BEAT:\s*(\w+)/.exec(p);
   if (t) return { beat: beat ? beat(t[1]) : goodBeat(t[1]) };
   if (/"comedy_story": \{"setup"/.test(p)) return story();
-  if (/\{"ending_vars"/.test(p)) return { ending_vars: umbrellaStory().ending_vars };
   return goodScript();
 }
 const isScriptPrompt = (req) => /CONCEPT_TITLE/.test(req.prompt || '');
