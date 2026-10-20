@@ -5,7 +5,7 @@ import { state, act } from '../state.js';
 import { api } from '../api.js';
 import { confirmPaid, busyButton } from './common.js';
 import { attach } from './script-validate.js';
-import { withTranslate } from './translate-box.js';
+import { withTranslate, translateControl } from './translate-box.js';
 
 const ACTIONS = {
   story: ['코미디 스토리 다시 만들기', 'PART A 전체(여섯 단계)를 새로 씁니다. PART B 엔딩은 건드리지 않습니다.'],
@@ -70,27 +70,50 @@ export function formulaLayout({ ep, d, blocks, dirty, redrawAll, v, index, addSc
   };
   const actionBtn = (action, cls = 'btn sm ghost') => h('button', { class: cls, title: ACTIONS[action][1], disabled: !ep.derived.concept.approved || (action !== 'story' && action !== 'ending' && !hasA), onclick: () => run(action) }, ACTIONS[action][0]);
 
-  // Written instruction for ONE beat -> the same paid regenerate action (estimate -> cost confirmation -> request; a protected overwrite is asked again).
-  // The card only carries one "🪄 AI로 다듬기" button; the instruction is written in a small dialog.
-  const openRefine = (b) => {
-    const action = BEAT_REFINE[b.key];
+  // Story-flow dialog: the six steps as tabs (free to move between them), each showing its Korean content first and taking its own written
+  // instruction -> the same paid regenerate action for that ONE step (estimate -> cost confirmation -> request; a protected overwrite is asked again).
+  // English story / visual stay what is stored and sent to the AI; a Korean translation is available on request (cost-confirmed, cached).
+  const openStoryFlow = (startKey) => {
+    const drafts = {};
+    let active = startKey || F.partA[0].key;
     modal((close) => {
-      const ta = h('textarea', { rows: 2, maxlength: 1000, 'data-beat-instruction': b.key, 'aria-label': `${b.label} AI 수정 지시문`, placeholder: '이 단계에서 고치고 싶은 내용을 적어 주세요. 예) 다이앤의 반응을 더 장난스럽게, 반전을 더 늦게 보여주기…' });
-      const btn = h('button', { class: 'btn clay', type: 'button', 'data-beat-refine': b.key, onclick: async (ev) => {
-        const instruction = ta.value.trim();
-        if (!instruction) return toast('고치고 싶은 내용을 입력하세요', { error: true });
-        if (d.dirty || d.epDirty) return toast('저장하지 않은 변경이 있습니다. 먼저 저장한 뒤 AI 수정을 실행하세요 (이 단계의 장면이 새로 바뀝니다).', { error: true });
-        const busy = busyButton(ev.currentTarget);
-        if (!busy.begin('비용 계산 중…')) return;
-        try { await run(action, { extra: instruction, busy }); close(); } finally { busy.end(); }
-      } }, '🪄 이 단계 AI로 다시 쓰기');
-      return h('div', { class: 'stack', style: 'gap:10px', 'data-beat-refine-box': b.key },
-        h('h3', { style: 'margin:0' }, `${b.label} · ${b.labelEn} — AI로 다듬기`),
-        h('div', { class: 'small muted' }, ACTIONS[action][1]),
-        ta,
-        h('div', { class: 'small muted' }, '유료 AI 호출입니다 (비용 확인 후 실행). 이전 대본은 버전 기록에 남습니다.'),
-        h('div', { class: 'row', style: 'gap:8px;justify-content:flex-end' }, h('button', { class: 'btn ghost', type: 'button', onclick: close }, '취소'), btn));
-    });
+      const root = h('div', { class: 'stack story-flow', style: 'gap:12px', 'data-story-flow': '' });
+      const draw = () => {
+        const b = F.partA.find((x) => x.key === active);
+        const action = BEAT_REFINE[b.key];
+        const bd = d.comedy_story[b.key] || {};
+        const tabs = h('div', { class: 'row', role: 'tablist', 'aria-label': '스토리 단계', style: 'gap:6px;flex-wrap:wrap' }, F.partA.map((x, i) => h('button', { class: 'btn sm ' + (x.key === active ? 'clay' : 'ghost'), type: 'button', role: 'tab', 'aria-selected': x.key === active ? 'true' : 'false', 'data-flow-tab': x.key, onclick: () => { keep(); active = x.key; draw(); } }, `${i + 1}. ${x.label}`)));
+        const taKey = b.key;
+        const ta = h('textarea', { rows: 4, maxlength: 1000, 'data-beat-instruction': b.key, 'aria-label': `${b.label} AI 수정 지시문`, placeholder: '이 단계에서 고치고 싶은 내용을 한국어로 적어 주세요. 예) 다이앤의 반응을 더 장난스럽게, 반전을 더 늦게 보여주기…' }, drafts[taKey] || '');
+        function keep() { drafts[taKey] = ta.value; }
+        const scenes = b.sceneIds.map((id) => {
+          const sc = ep.scenes.find((x) => x.id === id) || {};
+          const lines = (d.lines || []).filter((l) => l.sceneId === id && (l.ko || l.en));
+          return h('div', { class: 'card flat stack', style: 'gap:4px', 'data-flow-scene': id },
+            h('b', null, `${id} · ${sc.title_ko || sc.title || '제목 없음'}`),
+            lines.length ? lines.map((l) => h('div', { class: 'small' }, h('span', { class: 'muted' }, l.speaker + ': '), l.ko || l.en)) : h('div', { class: 'small muted' }, '대사 없음'));
+        });
+        const en = h('div', { class: 'field' }, h('label', null, '이야기 · 비주얼 (English · AI에 전달되는 원문)'), h('div', { class: 'small muted', lang: 'en' }, bd.story_en || '—'), h('div', { class: 'small muted', lang: 'en' }, bd.visual || ''));
+        const tr = translateControl(ep, () => [bd.story_en, bd.visual].filter(Boolean).join('\n\n'));
+        const submit = h('button', { class: 'btn clay', type: 'button', 'data-beat-refine': b.key, disabled: !ep.derived.concept.approved || !b.sceneIds.length, onclick: async (ev) => {
+          const instruction = ta.value.trim();
+          if (!instruction) return toast('고치고 싶은 내용을 입력하세요', { error: true });
+          if (d.dirty || d.epDirty) return toast('저장하지 않은 변경이 있습니다. 먼저 저장한 뒤 AI 수정을 실행하세요 (이 단계의 장면이 새로 바뀝니다).', { error: true });
+          const busy = busyButton(ev.currentTarget);
+          if (!busy.begin('비용 계산 중…')) return;
+          try { await run(action, { extra: instruction, busy }); close(); } finally { busy.end(); }
+        } }, '🪄 이 단계 AI로 다시 쓰기');
+        root.replaceChildren(
+          h('h3', { style: 'margin:0' }, '스토리 플로우 · AI로 다듬기'),
+          tabs,
+          h('div', { class: 'grid two' },
+            h('div', { class: 'stack', style: 'gap:8px' }, h('div', null, h('b', null, `${b.label} · ${b.labelEn}`), h('span', { class: 'small muted' }, ` ${b.durationSec || 0}초`)), h('div', { class: 'small' }, bd.title_ko || '(제목 없음)'), h('div', { class: 'small muted' }, b.role), scenes.length ? scenes : h('div', { class: 'small muted' }, '이 단계에 장면이 없습니다.'), en, h('div', { class: 'row' }, tr.btn), tr.panel),
+            h('div', { class: 'stack', style: 'gap:8px', 'data-beat-refine-box': b.key }, h('b', null, `${b.label} 수정 지시`), h('div', { class: 'small muted' }, ACTIONS[action][1]), ta, h('div', { class: 'small muted' }, '유료 AI 호출입니다 (비용 확인 후 실행). 이 단계만 바뀌고 다른 단계와 PART B 엔딩은 그대로입니다.'), h('div', { class: 'row', style: 'gap:8px;justify-content:flex-end' }, h('button', { class: 'btn ghost', type: 'button', onclick: close }, '취소'), submit))));
+        ta.focus();
+      };
+      draw();
+      return root;
+    }, { wide: true });
   };
 
   const field = (label, value, on, { rows = 2, kind = '', lang, rf } = {}) => {
@@ -109,7 +132,7 @@ export function formulaLayout({ ep, d, blocks, dirty, redrawAll, v, index, addSc
     card.append(h('div', { class: 'row between', style: 'flex-wrap:wrap;gap:8px' },
       h('div', { class: 'row' }, h('span', { class: 'eyebrow' }, `${i + 1}/6`), h('h3', { style: 'margin:0' }, `${b.label} · ${b.labelEn}`), EPISODE()),
       h('div', { class: 'row' }, chip(`${b.durationSec || 0}초`, ''), chip('장면 ' + (b.sceneIds.length ? b.sceneIds.join(', ') : '없음'), b.sceneIds.length ? '' : 'err'), BEAT_ACTION[b.key] ? actionBtn(BEAT_ACTION[b.key]) : null,
-        h('button', { class: 'btn sm clay', type: 'button', 'data-beat-refine-open': b.key, disabled: !ep.derived.concept.approved || !b.sceneIds.length, title: !b.sceneIds.length ? '먼저 코미디 스토리를 만들어 이 단계에 장면이 있어야 합니다' : ACTIONS[BEAT_REFINE[b.key]][1], onclick: () => openRefine(b) }, '🪄 AI로 다듬기'))));
+        h('button', { class: 'btn sm clay', type: 'button', 'data-beat-refine-open': b.key, disabled: !ep.derived.concept.approved || !b.sceneIds.length, title: !b.sceneIds.length ? '먼저 코미디 스토리를 만들어 이 단계에 장면이 있어야 합니다' : ACTIONS[BEAT_REFINE[b.key]][1], onclick: () => openStoryFlow(b.key) }, '🪄 AI로 다듬기'))));
     card.append(h('div', { class: 'small muted' }, b.role));
     card.append(h('div', { class: 'small' }, h('b', null, bd.title_ko || '(제목 없음)'), h('span', { class: 'muted' }, b.subtitle_ko ? ' · ' + b.subtitle_ko : '')));
     const fieldBox = h('div', { class: 'stack', style: 'gap:12px;margin-top:10px' });
