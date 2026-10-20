@@ -14,6 +14,7 @@ import { sceneFocus, sceneNavigator, currentSceneId, setFocus, switchScene, addS
 import { guardLeave } from './leave-guard.js';
 import { versionMenu, versionManager } from './episode-actions.js';
 import { draftOf } from './script-draft.js';
+import { collapsedNow, setCollapsed } from './scene-collapse.js';
 
 // Wide screens (PC) show EVERY scene, S1 … last, as stacked cards; narrow screens (phone) show one scene at a time.
 const WIDE = window.matchMedia('(min-width: 901px)');
@@ -54,6 +55,16 @@ export function script() {
   ctx.addScene = (afterSid) => addScene(ep, d, ctx, undefined, afterSid);
   const wide = WIDE.matches;
   const focusScene = (id) => switchScene(ep, d, id, ctx);
+  // chip click on the story map: phone = switch to that scene; PC = unfold its card, scroll to it and flash it
+  const openSceneFromMap = async (sceneId) => {
+    if (!wide) return focusScene(sceneId);
+    if (collapsedNow(ep.id, sceneId)) { setCollapsed(ep.id, sceneId, false); await hooks.rerender(); }
+    const card = document.getElementById('script-scene-' + sceneId);
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.remove('highlight-flash'); void card.offsetWidth; card.classList.add('highlight-flash');
+    setTimeout(() => card.classList.remove('highlight-flash'), 1300);
+  };
   // leaving this page with unsaved edits asks first (see main.js)
   state.leaveGuard = { dirty: () => !!(d.dirty || d.epDirty), save: () => saveAllDirty(ep, d, ctx) };
 
@@ -69,7 +80,7 @@ export function script() {
   const wrap = h('div', { class: 'stack script-studio', style: 'gap:14px' });
   const picker = episodePicker(); // the title / intro banner is gone; keep the episode switch
   if (picker) wrap.append(h('div', { class: 'row', style: 'justify-content:flex-end' }, picker));
-  wrap.append(structureMap(ep, { dirty: () => d.dirty || d.epDirty })); // story map first: the whole episode at a glance
+  wrap.append(structureMap(ep, { dirty: () => d.dirty || d.epDirty, addSceneIn: ep.formula.structured ? addSceneHere : null, openScene: openSceneFromMap })); // story map first: the whole episode at a glance
   wrap.append(assetStrip(ep));
   wrap.append(projectPanel(ep, d, errorSummary(ep, index, { onJump })));
   if (ep.derived.scriptChangedSinceApproval) wrap.append(h('div', { class: 'banner warn' }, h('div', null, h('b', null, '승인 후 대본이 수정되었습니다'), '유료 생성·음성·렌더가 잠겼습니다. 바뀐 씬을 다시 확인하고 승인하세요.')));
