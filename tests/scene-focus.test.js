@@ -55,7 +55,7 @@ test('씬 저장: saves only this scene as a draft, even when invalid; never app
   assert.deepEqual(ids(s, id), order0, 'scene order and IDs are preserved');
   const after = s.store.episodes.get(id);
   assert.equal(JSON.stringify({ scenes: after.scenes.filter((x) => x.id !== 'S2'), lines: after.lines.filter((l) => l.sceneId !== 'S2') }), otherHash, 'every other scene and its dialogue is untouched');
-  assert.equal(v.scenes.filter((x) => x.approval.approved).length, 9, 'other approvals stay');
+  assert.equal(v.scenes.filter((x) => x.approval.approved).length, 5, 'other approvals stay');
   assert.deepEqual(after.lines.filter((l) => l.sceneId === 'S2').map((l) => l.id), own.map((l) => l.id), 'line ids are kept');
   assert.ok(s.store.episodes.versions(id).some((x) => /씬 저장 \(S2\)/.test(x.note)));
 });
@@ -91,34 +91,35 @@ test('씬 저장 adds new dialogue lines with fresh unique ids and keeps the oth
 });
 
 // ---------- 씬 추가 / 삭제 ----------
-test('씬 추가: a new empty draft scene right after the current one; nothing existing is overwritten; Part B stays fixed', async () => {
+test('씬 추가: a new empty draft scene right after the current one; nothing existing is overwritten; no Part B exists', async () => {
   const { s, id } = await episode();
   await s.projects.approveReady(id);
   const before = s.store.episodes.get(id);
   const order0 = ids(s, id);
   const v = await s.addScene(id, { afterSceneId: 'S2' });
-  assert.equal(v.newSceneId, 'S11');
+  assert.equal(v.newSceneId, 'S7');
   const order1 = ids(s, id);
-  assert.deepEqual(order1.filter((x) => x !== 'S11'), order0, 'existing scenes keep their ids and order');
-  assert.equal(order1[order1.indexOf('S2') + 1], 'S11', 'inserted right after the current scene');
-  const sc = v.scenes.find((x) => x.id === 'S11');
+  assert.deepEqual(order1.filter((x) => x !== 'S7'), order0, 'existing scenes keep their ids and order');
+  assert.equal(order1[order1.indexOf('S2') + 1], 'S7', 'inserted right after the current scene');
+  const sc = v.scenes.find((x) => x.id === 'S7');
   assert.equal(sc.approval.status, 'draft');
   assert.equal(sc.beatKey, before.scenes.find((x) => x.id === 'S2').beatKey, 'stays inside the same story beat');
-  assert.equal(v.scenes.filter((x) => x.part === 'B').length, 4);
-  assert.equal(v.scenes.filter((x) => x.approval.approved).length, 10, 'approvals of existing scenes are untouched');
-  assert.equal(v.derived.sceneApproval.progress, '10/11 씬 승인');
-  // from a Part B scene the new scene goes to the end of "제품 연결" (Part A)
-  const v2 = await s.addScene(id, { afterSceneId: 'E2' });
+  assert.equal(v.scenes.filter((x) => x.part === 'B').length, 0, 'no ending scenes exist');
+  assert.equal(v.scenes.filter((x) => x.approval.approved).length, 6, 'approvals of existing scenes are untouched');
+  assert.equal(v.derived.sceneApproval.progress, '6/7 씬 승인');
+  // after the last scene (product_bridge) the new scene stays in "제품 연결" and goes to the very end
+  const last = ids(s, id).slice(-1)[0];
+  const v2 = await s.addScene(id, { afterSceneId: last });
   const added = v2.scenes.find((x) => x.id === v2.newSceneId);
   assert.equal(added.part, 'A');
   assert.equal(added.beatKey, 'product_bridge');
-  assert.deepEqual(v2.scenes.slice(-4).map((x) => x.id), ['E1', 'E2', 'E3', 'E4']);
+  assert.equal(v2.scenes.slice(-1)[0].id, v2.newSceneId, 'appended at the end');
   await assert.rejects(s.addScene(id, { afterSceneId: 'S1', beatKey: 'shopping_excuse' }), (e) => e.code === 'BAD_BEAT');
 });
 
-test('씬 삭제: protects the ending and the last scene of a beat; ids of deleted scenes are never reused (their assets must not attach to a new scene)', async () => {
+test('씬 삭제: protects the last scene of a beat; ids of deleted scenes are never reused (their assets must not attach to a new scene)', async () => {
   const { s, id } = await episode();
-  await assert.rejects(s.deleteScene(id, 'E1'), (e) => e.code === 'ENDING_LOCKED');
+  await assert.rejects(s.deleteScene(id, 'E1'), (e) => e.code === 'NOT_FOUND', 'there is no E1 ending scene any more');
   await assert.rejects(s.deleteScene(id, 'S1'), (e) => e.code === 'BEAT_EMPTY');
   const added = (await s.addScene(id, { afterSceneId: 'S1' })).newSceneId;
   await s.store.episodes.update(id, (ep) => { ep.clips[added] = { versions: [{ v: 1, file: 'x.mp4' }], approvedVersion: 1 }; });
