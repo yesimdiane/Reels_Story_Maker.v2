@@ -17,7 +17,7 @@ export function structureMap(ep, { dirty, addSceneIn, openScene }) {
   const chipFor = (sc) => {
     const ap = sc.approval || {};
     const el = h('div', { class: 'scene-chip' + (ap.approved ? ' approved' : '') + (ap.errorCount ? ' has-err' : ''), draggable: 'true', 'data-scene': sc.id, title: `${sc.id} · ${sc.title_ko || ''}${ap.label ? ' · ' + ap.label : ''}` },
-      h('b', null, sc.id), ' ', short(sc.title_ko), ap.approved ? h('span', { class: 'tab-badge ok' }, '✓') : ap.errorCount ? h('span', { class: 'tab-badge err' }, String(ap.errorCount)) : null);
+      h('b', null, sc.id), h('span', { class: 'chip-title' }, sc.title_ko || ''), ap.approved ? h('span', { class: 'tab-badge ok' }, '✓') : ap.errorCount ? h('span', { class: 'tab-badge err' }, String(ap.errorCount)) : null);
     el.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', sc.id); e.dataTransfer.effectAllowed = 'move'; el.classList.add('dragging'); });
     el.addEventListener('dragend', () => el.classList.remove('dragging'));
     el.addEventListener('click', () => { if (openScene) openScene(sc.id); });
