@@ -75,7 +75,7 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
   const presets = createScriptPresets({ store, prompts, seedDir: SEED_DIR });
   const endings = createEndingTemplates({ store, seedDir: SEED_DIR });
   const episodeIds = createEpisodeIds({ store, products });
-  const scriptgen = createScriptGen({ store, products, storylab, episodeIds, prompts, presets, endings, router, lib: () => store.characters.load(), universes: () => universes });
+  const scriptgen = createScriptGen({ store, products, storylab, episodeIds, prompts, presets, router, lib: () => store.characters.load(), universes: () => universes });
   const sceneRegen = createSceneRegen({ store, storylab, router, universes, lib: () => store.characters.load(), charRefs: { textNote: (...a) => charRefs.textNote(...a) }, saveScene: (...a) => saveScene(...a), assertNotHeld: (...a) => assertNotHeld(...a), log });
   const translator = createTranslator({ store, router });
   const cutPresets = createCutPresets({ store });
@@ -125,7 +125,7 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
   const publishing = createPublishingService({ store });
   store.episodes.seedDemo();
   // Projects / scene approvals / Image Development hand-off (no AI or video provider is wired in: nothing here can spend money).
-  const projects = createProjects({ store, lib: () => store.characters.load(), endings, products, episodeIds, log });
+  const projects = createProjects({ store, lib: () => store.characters.load(), products, episodeIds, log });
   store.episodes.hooks.before = projects.hooks.before;
   store.episodes.hooks.after = projects.hooks.after;
 
@@ -179,19 +179,16 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
     return (ep.generation.jobs || []).some((j) => ACTIVE_JOB.has(j.status)) || (ep.lipsyncJobs || []).some((j) => ['preparing', 'submitting', 'processing'].includes(j.status));
   }
 
-  /** Structured view of the fixed formula for the Script Studio UI (Part A beats, Part B template slots, what is template vs episode-specific). */
+  /** Structured view of the episode formula for the Script Studio UI (the six beats). */
   function formulaView(ep) {
     if (!F.isStructured(ep)) return { structured: false };
     const shape = (key, group) => {
       const b = ep[group][key] || {};
-      const other = group === 'product_ending' && ep.universeId && ep.universeId !== 'jackdiane'; // the fixed shot labels name Diane/Jack: other universes show their own shot titles
-      return Object.assign({ key, label: other ? (b.title_ko || (F.beatMeta(key) || {}).ko) : (F.beatMeta(key) || {}).ko, labelEn: other ? '' : (F.beatMeta(key) || {}).en, role: (F.beatMeta(key) || {}).role || '' }, b, { subtitle_ko: F.beatSubtitles(ep, key) });
+      return Object.assign({ key, label: (F.beatMeta(key) || {}).ko, labelEn: (F.beatMeta(key) || {}).en, role: (F.beatMeta(key) || {}).role || '' }, b, { subtitle_ko: F.beatSubtitles(ep, key) });
     };
     return {
       structured: true,
       partA: F.BEAT_KEYS.map((k) => shape(k, 'comedy_story')),
-      partB: F.ENDING_KEYS.map((k) => shape(k, 'product_ending')),
-      ending: { templateId: (ep.ending || {}).templateId, templateName: (ep.ending || {}).templateName, templateVersion: (ep.ending || {}).templateVersion, pinnedVersion: (ep.ending || {}).version || null, structureLocked: !!(ep.ending || {}).structureLocked, vars: SF.endingVars(ep), manualVars: (ep.ending || {}).manualVars || [] },
     };
   }
 
@@ -527,9 +524,9 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
         // title_ko is the Korean scene title (edited on its own); the legacy `title` mirrors it so every older reader shows the same text.
         title_ko: String(s.title_ko != null ? s.title_ko : prev.title_ko || '').trim().slice(0, 60),
         title: (s.title_ko != null ? String(s.title_ko).trim() : prev.title_ko) ? String(s.title_ko != null ? s.title_ko : prev.title_ko).trim().slice(0, 60) : String(s.title != null ? s.title : prev.title || '').slice(0, 120),
-        // fixed formula: which beat (and part) the scene belongs to; a Part B scene's slot can never be re-assigned from the client
-        part: prev.part === 'B' ? 'B' : (F.partOf(s.beatKey) || prev.part || ''),
-        beatKey: prev.part === 'B' ? prev.beatKey : (F.partOf(s.beatKey) === 'A' ? s.beatKey : prev.beatKey || ''),
+        // fixed formula: which beat the scene belongs to
+        part: F.partOf(s.beatKey) || prev.part || '',
+        beatKey: F.partOf(s.beatKey) === 'A' ? s.beatKey : prev.beatKey || '',
         manualEdit: !!prev.manualEdit,
         beat: num(s.beat, prev.beat || i + 1),
         durationSec: num(s.durationSec, prev.durationSec || 4),
@@ -569,21 +566,11 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
       if (Array.isArray(patch.beats)) ep.beats = patch.beats.map(String);
       if (Array.isArray(patch.scenes)) {
         ep.scenes = sanitizeScenes(patch.scenes, ep.scenes);
-        if (prevEp) SF.enforceLock(prevEp, ep.scenes); // Part B structure stays locked while only its product-specific content changes
       }
       if (Array.isArray(patch.lines)) ep.lines = sanitizeLines(patch.lines, ep);
       if (prevEp) {
         SF.markEdits(prevEp, ep); // hand edits are remembered so AI actions never silently overwrite them
         SF.markBeatEdits(prevEp, ep, patch);
-        if (patch.ending && typeof patch.ending === 'object') {
-          const cur = SF.endingVars(ep);
-          const pv = patch.ending.vars || {};
-          const manual = new Set(ep.ending.manualVars || []);
-          let varsChanged = false;
-          Object.keys(pv).forEach((k) => { if (endings.VAR_KEYS.includes(k) && String(pv[k]).trim() !== String(cur[k] || '').trim()) { ep.ending.vars[k] = String(pv[k]).trim().slice(0, 300); manual.add(k); varsChanged = true; } });
-          ep.ending.manualVars = Array.from(manual);
-          if (varsChanged) SF.applyEnding(ep, endings, { respectEdits: true }); // only when a product-specific value really changed
-        }
         F.syncBeats(ep);
       }
       if (patch.cta) {
@@ -1079,7 +1066,6 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
     await store.episodes.update(id, (ep) => {
       const src = ep.scenes.find((x) => x.id === sceneId);
       if (!src) throw new StudioError('NOT_FOUND', '장면을 찾을 수 없습니다: ' + sceneId, { status: 404 });
-      if (F.isStructured(ep) && src.part === 'B') throw new StudioError('ENDING_LOCKED', '고정 제품 엔딩 컷은 복제할 수 없습니다.', { status: 409 });
       const used = new Set(ep.scenes.map((s) => s.id).concat(Object.keys(ep.clips || {}), Object.keys(ep.prompts || {}), Object.keys(ep.sceneApprovals || {})));
       let n = ep.scenes.length + 1;
       while (used.has('S' + n)) n += 1;
@@ -1109,17 +1095,13 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
     return v;
   }
 
-  /** Removes one scene and its dialogue. Clips, images, prompts and the approval history stay on disk (nothing is deleted). The fixed ending and the last scene of a story beat cannot be removed. */
+  /** Removes one scene and its dialogue. Clips, images, prompts and the approval history stay on disk (nothing is deleted). The last scene of a story beat cannot be removed. */
   async function deleteScene(id, sceneId, by = 'operator') {
     await store.episodes.update(id, (ep) => {
       const sc = ep.scenes.find((x) => x.id === sceneId);
       if (!sc) throw new StudioError('NOT_FOUND', '장면을 찾을 수 없습니다: ' + sceneId, { status: 404 });
       if (F.isStructured(ep)) {
-        if (sc.part === 'B') {
-          // the fixed ending can be trimmed only after its structure lock is released, and never below one scene per ending shot (shopping excuse → demo → Jack's reaction)
-          if (ep.ending && ep.ending.structureLocked) throw new StudioError('ENDING_LOCKED', '고정 제품 엔딩 컷은 삭제할 수 없습니다. 엔딩의 "구조 잠금"을 해제하면 같은 컷에 나뉜 씬을 지울 수 있습니다.', { status: 409 });
-          if (ep.scenes.filter((x) => x.part === 'B' && x.beatKey === sc.beatKey).length <= 1) throw new StudioError('SHOT_EMPTY', '엔딩의 각 컷(핑계 · 제품 시연 · 잭의 반응)에는 최소 한 씬이 필요합니다. 이 씬이 이 컷의 마지막 씬입니다.', { status: 422 });
-        } else if (ep.scenes.filter((x) => x.part === 'A' && x.beatKey === sc.beatKey).length <= 1) throw new StudioError('BEAT_EMPTY', '각 스토리 단계에는 최소 한 씬이 필요합니다. 이 씬이 이 단계의 마지막 씬입니다.', { status: 422 });
+        if (ep.scenes.filter((x) => x.beatKey === sc.beatKey).length <= 1) throw new StudioError('BEAT_EMPTY', '각 스토리 단계에는 최소 한 씬이 필요합니다. 이 씬이 이 단계의 마지막 씬입니다.', { status: 422 });
       } else if (ep.scenes.length <= 1) throw new StudioError('LAST_SCENE', '마지막 씬은 삭제할 수 없습니다.', { status: 422 });
       const i = ep.scenes.indexOf(sc);
       ep.scenes.splice(i, 1);
@@ -1142,8 +1124,7 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
       const before = ep.scenes.map((x) => x.id);
       if (F.isStructured(ep)) {
         if (!beats || typeof beats !== 'object') throw new StudioError('BAD_ORDER', '단계별 장면 순서가 필요합니다.', { status: 422 });
-        const a = ep.scenes.filter((x) => x.part !== 'B');
-        const b = ep.scenes.filter((x) => x.part === 'B');
+        const a = ep.scenes.slice();
         const given = [].concat(...F.BEAT_KEYS.map((k) => (Array.isArray(beats[k]) ? beats[k].map(String) : [])));
         if (given.length !== a.length || new Set(given).size !== a.length || a.some((x) => !given.includes(x.id))) throw new StudioError('BAD_ORDER', '장면 목록이 현재와 맞지 않습니다. 화면을 새로고침하세요.', { status: 409 });
         const empty = F.BEAT_KEYS.filter((k) => !(beats[k] || []).length);
@@ -1154,7 +1135,7 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
           sc.part = 'A'; sc.beatKey = k; sc.beat = F.ALL_KEYS.indexOf(k) + 1;
           next.push(sc);
         }));
-        ep.scenes = next.concat(b);
+        ep.scenes = next;
         F.syncBeats(ep);
       } else {
         if (!Array.isArray(order) || order.length !== ep.scenes.length || new Set(order).size !== order.length || ep.scenes.some((x) => !order.includes(x.id))) throw new StudioError('BAD_ORDER', '장면 목록이 현재와 맞지 않습니다. 화면을 새로고침하세요.', { status: 409 });
@@ -1183,33 +1164,6 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
     });
     store.episodes.audit(id, 'scene.title', { sceneId, title: t });
     return episodeView(id);
-  }
-
-  /**
-   * Reuse approved ending start frames from another episode (same series template slots). A frame that shows the product is only
-   * reused when it is the SAME product; frames are copied (the source episode is never changed) and keep their approval record.
-   */
-  async function reuseEndingAssets(id, fromId, by = 'operator') {
-    const ep = store.episodes.get(id);
-    const src = store.episodes.get(fromId);
-    if (!F.isStructured(ep) || !F.isStructured(src)) throw new StudioError('NOT_FORMULA', '두 에피소드 모두 고정 에피소드 포맷이어야 합니다.', { status: 409 });
-    if (id === fromId) throw new StudioError('SAME_EPISODE', '같은 에피소드입니다.', { status: 400 });
-    const copied = [];
-    const skipped = [];
-    for (const key of F.ENDING_KEYS) {
-      const from = src.scenes.find((x) => x.part === 'B' && x.beatKey === key);
-      const to = ep.scenes.find((x) => x.part === 'B' && x.beatKey === key);
-      const si = from && from.startImage;
-      if (!from || !to || !si || si.type !== 'upload' || !si.approved) { skipped.push({ key, reason: '승인된 시작 프레임이 없습니다.' }); continue; }
-      if (to.showsProduct && src.productId !== ep.productId) { skipped.push({ key, reason: '다른 제품이 보이는 컷이라 재사용하지 않습니다.' }); continue; }
-      const file = store.episodes.file(fromId, 'startframes', si.file);
-      if (!fs.existsSync(file)) { skipped.push({ key, reason: '원본 파일이 없습니다.' }); continue; }
-      store.episodes.saveFile(id, path.join('startframes', si.file), fs.readFileSync(file));
-      await store.episodes.update(id, (e) => { const t = e.scenes.find((x) => x.id === to.id); t.startImage = { type: 'upload', file: si.file, sha256: si.sha256, approved: true, approvedBy: by, name: si.name || '재사용 프레임', reusedFrom: { episodeId: fromId, sceneId: from.id } }; });
-      copied.push(key);
-    }
-    store.episodes.audit(id, 'ending.assets_reused', { from: fromId, copied, skipped });
-    return { copied, skipped, view: episodeView(id) };
   }
 
   async function setStartImage(id, sceneId, startImage) {
@@ -1637,7 +1591,7 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
   return {
     exportName, sceneFlow, animGate, lipsync, uploadMusic, videoEdit, sfx, cfg, characterView, aiDiagnostics, store, video, gen, startImages, productAnalysis, charRefs, brollImages, animplan, renderReadiness, presets, endings, voice, renderer, publishing, vault: keys, runtime, usage, prompts, router, products, storylab, universes, sceneRegen, voiceCatalog, scriptgen, integrations, createEpisodeFromConcept, migrateLegacy, projects, translator, cutPresets, saveInserts, cutFrame,
     saveOutfitLock, summary, episodeView, episodeIds, sba, performance, manychat, setEpisodeCategory, holdEpisode, resumeEpisode, assertNotHeld, editEpisode, providerStatus, createEpisode, saveScript, approveScript, revokeScript, restoreVersion, addSuggestion,
-    rebuildPrompts, savePrompt, setSceneTitle, reorderScenes, saveScene, addScene, duplicateScene, deleteScene, trashEpisode, restoreEpisode, trashList, archiveEpisode, unarchiveEpisode, episodeImpact, scriptVersions, deleteScriptVersion, undeleteScriptVersion, reuseEndingAssets, setStartImage, uploadStartFrame, approveStartFrame, deleteStartFrame, saveImagePrompt, resetImagePrompt, approveStoryboard, revokeStoryboard, saveAnimationSettings, addCustomModel, removeCustomModel, confirmModel, muapiCliModels, confirmMuapiTts, muapiCheck, setSpendLimit,
+    rebuildPrompts, savePrompt, setSceneTitle, reorderScenes, saveScene, addScene, duplicateScene, deleteScene, trashEpisode, restoreEpisode, trashList, archiveEpisode, unarchiveEpisode, episodeImpact, scriptVersions, deleteScriptVersion, undeleteScriptVersion, setStartImage, uploadStartFrame, approveStartFrame, deleteStartFrame, saveImagePrompt, resetImagePrompt, approveStoryboard, revokeStoryboard, saveAnimationSettings, addCustomModel, removeCustomModel, confirmModel, muapiCliModels, confirmMuapiTts, muapiCheck, setSpendLimit,
     updateCharacter, characterView, promptStatus: promptSvc.status, saveSettings, loadDemoReferences, uploadSfx, updateSfx, mediaFile,
   };
 }

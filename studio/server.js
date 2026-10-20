@@ -234,8 +234,6 @@ function createApp(studio, { token = '', port = 0, host = '127.0.0.1', log = () 
   route('PUT', '/api/ending-templates/:id', async ({ p, body }) => S.endings.save(p.id, { shots: body.shots, structureLocked: body.structureLocked, name: body.name, note: body.note }));
   route('POST', '/api/ending-templates/:id/duplicate', async ({ p, body }) => S.endings.duplicate(p.id, { name: body.name }));
   route('POST', '/api/ending-templates/:id/restore', async ({ p, body }) => S.endings.restore(p.id, { version: body.version, toDefault: body.toDefault === true }));
-  route('PUT', '/api/episodes/:id/script/ending', async ({ p, body }) => { await S.scriptgen.selectEnding(p.id, { templateId: body.templateId, version: body.version, resetEdits: body.resetEdits === true }); return ep(p.id); });
-  route('POST', '/api/episodes/:id/script/ending/reuse', async ({ p, body }) => { const r = await S.reuseEndingAssets(p.id, body.fromEpisodeId); const v = ep(p.id); v.reuse = { copied: r.copied, skipped: r.skipped }; return v; });
   route('POST', '/api/episodes/:id/script/regenerate', async ({ p, body }) => { const r = await S.scriptgen.regenerate(p.id, body.action, { confirm: body.confirm, overwrite: body.overwrite === true, extra: body.extra }); const v = ep(p.id); v.generated = r; return v; });
   route('POST', '/api/episodes/:id/script/timing/estimate', async ({ p, body }) => S.scriptgen.fitEstimate(p.id, body.sceneIds, body.preset));
   route('POST', '/api/episodes/:id/script/timing/fit', async ({ p, body }) => { const r = await S.scriptgen.fitDialogue(p.id, { sceneIds: body.sceneIds, confirm: body.confirm, overwrite: body.overwrite === true, extra: body.extra, sel: body.preset }); const v = ep(p.id); v.fitResult = r; return v; });

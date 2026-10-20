@@ -5,6 +5,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { readJson, writeJsonAtomic, writeFileAtomic, sha256, nowIso, StudioError, safeName } = require('./util');
+const { archiveEnding } = require('./formula');
 
 const SEED_DIR = path.join(__dirname, '..', 'seed');
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,40}$/;
@@ -183,13 +184,27 @@ function createStore({ dir, seedDir = SEED_DIR }) {
         .readdirSync(root)
         .map((id) => readJson(path.join(root, id, 'episode.json')))
         .filter(Boolean)
+        .map((e) => { archiveEnding(e); return e; }) // episodes saved with the old fixed ending never show it (the next save stores the archive)
         .filter((e) => all || (trashed ? !!e.trashedAt : !e.trashedAt))
         .sort((a, b) => String(a.id).localeCompare(String(b.id)));
     },
     get(id) {
       const ep = readJson(epFile(id));
       if (!ep) throw new StudioError('NOT_FOUND', '에피소드를 찾을 수 없습니다: ' + id, { status: 404 });
+      archiveEnding(ep);
       return ep;
+    },
+    /** Startup: stores the archive for every episode that still has the old fixed ending on disk (idempotent). Returns the ids it changed. */
+    archiveOldEndings() {
+      const root = p('episodes');
+      if (!fs.existsSync(root)) return [];
+      const done = [];
+      fs.readdirSync(root).forEach((id) => {
+        const file = path.join(root, id, 'episode.json');
+        const ep = readJson(file);
+        if (ep && archiveEnding(ep)) { writeJsonAtomic(file, ep); done.push(id); }
+      });
+      return done;
     },
     create(seed) {
       checkId(seed.id, '에피소드 ID');

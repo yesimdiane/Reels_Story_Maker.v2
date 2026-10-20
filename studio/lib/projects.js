@@ -16,7 +16,7 @@ const F = require('./formula');
 const clone = (x) => JSON.parse(JSON.stringify(x));
 const ID_OK = /^[A-Za-z0-9][A-Za-z0-9_-]{0,40}$/;
 
-function createProjects({ store, episodeIds, lib, endings, products, log = () => {} }) {
+function createProjects({ store, episodeIds, lib, products, log = () => {} }) {
   const registryFile = store.path('projects.json');
   const templatesFile = store.path('scene-templates.json');
 
@@ -40,29 +40,17 @@ function createProjects({ store, episodeIds, lib, endings, products, log = () =>
       ...p,
       episodes: eps.filter((e) => projectIdFor(e) === p.id).map((e) => {
         const ep = clone(e); SA.migrateSceneApprovals(ep, lib());
-        const r = SA.projectReadiness(ep, lib(), endingCheck(ep));
+        const r = SA.projectReadiness(ep, lib());
         return { id: e.id, title: e.title, scenes: r.sceneCount, scenesApproved: r.approvedCount, scriptApproved: isScriptApproved(e), handoff: !!(e.imageDev && e.imageDev.snapshot), duplicatedFrom: e.duplicatedFrom || null };
       }),
     }));
-  }
-
-  // ---------- ending template validity ----------
-  function endingCheck(ep) {
-    if (!F.isStructured(ep)) return { endingValid: true };
-    try {
-      const sel = ep.ending || {};
-      const r = endings.resolve({ templateId: sel.templateId, version: sel.version });
-      const shots = r.version && r.version.shots;
-      if (!shots || F.ENDING_KEYS.some((k) => !shots[k])) return { endingValid: false, endingNote: '엔딩 템플릿에 세 컷이 모두 있지 않습니다.' };
-      return { endingValid: true };
-    } catch (e) { return { endingValid: false, endingNote: '선택한 엔딩 템플릿을 찾을 수 없습니다: ' + e.message }; }
   }
 
   // ---------- readiness (read-only; works on a copy so old episodes show migrated scene approvals without a write) ----------
   function readiness(ep) {
     const copy = clone(ep);
     SA.migrateSceneApprovals(copy, lib());
-    return SA.projectReadiness(copy, lib(), endingCheck(copy));
+    return SA.projectReadiness(copy, lib());
   }
 
   /** Hooks used by the store on every write: migrate old episodes once, remember which approved scenes get edited. */
@@ -73,7 +61,7 @@ function createProjects({ store, episodeIds, lib, endings, products, log = () =>
 
   /** Startup: persists the migration for every episode (idempotent; ep.approvals is never touched). */
   function migrateAll() {
-    const done = [];
+    const done = store.episodes.archiveOldEndings(); // the fixed product ending was removed: old ending scenes move to ep.archivedEnding (nothing deleted)
     store.episodes.list().forEach((e) => {
       const ep = clone(e);
       let changed = SA.migrateSceneApprovals(ep, lib());
@@ -125,7 +113,7 @@ function createProjects({ store, episodeIds, lib, endings, products, log = () =>
   // ---------- project gate used by the script approval ----------
   /** Throws unless every required scene is approved and the project checks pass. */
   function assertProjectReady(ep) {
-    const r = SA.projectReadiness(ep, lib(), endingCheck(ep));
+    const r = SA.projectReadiness(ep, lib());
     if (r.blockers.length) throw new StudioError('SCENES_NOT_APPROVED', r.blockers[0].message, { details: r.blockers, recovery: '장면별로 "씬 승인"을 누른 뒤(또는 "승인 가능한 씬 모두 승인") 대본을 승인하세요.', status: 409 });
     return r;
   }
@@ -168,7 +156,7 @@ function createProjects({ store, episodeIds, lib, endings, products, log = () =>
     return {
       schema: 1, episodeId: ep.id, projectId: ep.projectId || projectIdFor(ep), title: ep.title, titleEn: ep.titleEn || '',
       scriptVersion: ep.version || 0, scriptHash: scriptFingerprint(ep), scenes,
-      cta: ep.cta, ending: ep.ending ? { templateId: ep.ending.templateId, templateName: ep.ending.templateName, templateVersion: ep.ending.templateVersion, vars: ep.ending.vars } : null,
+      cta: ep.cta,
       product: { id: ep.productId || '', name: ep.product && ep.product.name, verifiedFeatures: (ep.product && ep.product.verifiedFeatures) || [], forbiddenClaims: (ep.product && ep.product.forbiddenClaims) || [] },
       characterReferences: charRefs, productReferences: pRefs,
       approvals: { script: ep.approvals.script, scenes: Object.fromEntries(ep.scenes.map((s) => [s.id, ((ep.sceneApprovals[s.id] || {}).current) || null])) },
@@ -191,7 +179,7 @@ function createProjects({ store, episodeIds, lib, endings, products, log = () =>
     let result;
     await store.episodes.update(id, (ep) => {
       if (!isScriptApproved(ep)) throw new StudioError('SCRIPT_NOT_APPROVED', '대본이 승인되지 않았습니다. 대본을 승인한 뒤 이동하세요.', { status: 409 });
-      const r = SA.projectReadiness(ep, lib(), endingCheck(ep));
+      const r = SA.projectReadiness(ep, lib());
       if (!r.allScenesApproved) throw new StudioError('SCENES_NOT_APPROVED', `${r.progress} — 모든 씬이 승인되어야 합니다.`, { details: r.blockers, status: 409 });
       const snap = buildSnapshot(ep);
       const body = JSON.stringify(snap, null, 2);
@@ -254,7 +242,7 @@ function createProjects({ store, episodeIds, lib, endings, products, log = () =>
     for (let n = 1; n < 1000; n += 1) { const cand = `${base}-C${n}`; if (!store.episodes.exists(cand)) return cand; }
     throw new StudioError('NO_ID', '새 에피소드 ID를 만들 수 없습니다.');
   }
-  /** Independent copy of an episode's script (scenes, dialogue, CTA, ending selection). Approvals, prompts, images, clips, voices and renders are NOT copied. */
+  /** Independent copy of an episode's script (scenes, dialogue, CTA). Approvals, prompts, images, clips, voices and renders are NOT copied. */
   async function duplicateEpisode(srcId, { newId, title, by = 'operator' } = {}) {
     const src = store.episodes.get(srcId);
     // A copy is a NEW episode: with the product-based scheme it takes the next number of the product (never a reused one).
@@ -283,9 +271,8 @@ function createProjects({ store, episodeIds, lib, endings, products, log = () =>
   const nextSceneId = (ep, prefix = 'S') => { const used = new Set(ep.scenes.map((s) => s.id)); let n = ep.scenes.length + 1; while (used.has(prefix + n)) n += 1; return prefix + n; };
   const nextLineId = (ep, taken) => { let max = 0; ep.lines.concat(taken).forEach((l) => { const m = /^L(\d+)/.exec(l.id); if (m) max = Math.max(max, Number(m[1])); }); return 'L' + (max + 1); };
 
-  /** Inserts a copied scene (+dialogue) into an episode. Part B (the fixed product ending) cannot be copied in: reuse the ending template instead. */
+  /** Inserts a copied scene (+dialogue) into an episode. */
   function insertScene(ep, content, origin, { beatKey } = {}) {
-    if (content.scene.part === 'B') throw new StudioError('ENDING_SCENE', '제품 엔딩 컷은 장면 복사 대신 "엔딩 템플릿"으로 재사용하세요 (에피소드 복제 또는 Script Studio의 엔딩 템플릿 선택).', { status: 409 });
     const structured = F.isStructured(ep);
     let key = '';
     if (structured) {
@@ -329,7 +316,6 @@ function createProjects({ store, episodeIds, lib, endings, products, log = () =>
     const ep = store.episodes.get(epId);
     if (!ep.scenes.some((s) => s.id === sceneId)) throw new StudioError('NOT_FOUND', '장면을 찾을 수 없습니다.', { status: 404 });
     const content = SA.sceneSnapshot(ep, sceneId);
-    if (content.scene.part === 'B') throw new StudioError('ENDING_SCENE', '제품 엔딩 컷은 엔딩 템플릿(설정 → 엔딩 템플릿)으로 관리합니다.', { status: 409 });
     const d = readTemplates();
     const at = nowIso();
     let t = templateId && d.templates[templateId];
