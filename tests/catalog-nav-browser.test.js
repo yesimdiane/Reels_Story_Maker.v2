@@ -11,6 +11,7 @@ const path = require('node:path');
 const { loadConfig } = require('../renderer/lib/config');
 const { createStudio } = require('../studio/lib/studio');
 const { createApp } = require('../studio/server');
+const { gotoReady, until } = require('./helpers/route-ready');
 const zlib = require('node:zlib');
 
 let pw = null;
@@ -83,10 +84,8 @@ test('sidebar has exactly six items; episode stages, Video Production tabs and S
     // which rail item is active for each (legacy) route
     const activeFor = { [`products`]: 'products', storylab: 'storylab', episodes: 'episodes', [`script/${ID}`]: 'episodes', [`image/${ID}`]: 'image', [`animation/${ID}`]: 'video', [`voice/${ID}`]: 'video', [`lipsync/${ID}`]: 'video', [`render/${ID}`]: 'video', [`review/${ID}`]: 'episodes', [`publishing/${ID}`]: 'episodes', settings: 'settings' };
     for (const [route, key] of Object.entries(activeFor)) {
-      await page.goto(`${base}/#/${route}`);
-      await page.waitForSelector('#stage h1, #stage h2');
-      // the previous route's heading can still be on screen for a moment: wait for the rail to settle on the expected item
-      await page.waitForFunction((k) => { const a = document.querySelector('#rail a[aria-current=page]'); return a && a.getAttribute('data-nav') === k; }, key, { timeout: 15000 }).catch(() => {});
+      await gotoReady(page, base, route);
+      await until(page, (k) => { const a = document.querySelector('#rail a[aria-current=page]'); return a && a.getAttribute('data-nav') === k; }, key);
       assert.equal(await page.locator('#rail a[aria-current=page]').count(), 1, route);
       assert.equal(await page.locator('#rail a[aria-current=page]').getAttribute('data-nav'), key, route);
       assert.equal(await page.locator('#stage .banner.err').count(), 0, route + ' rendered an error');
@@ -99,7 +98,7 @@ test('sidebar has exactly six items; episode stages, Video Production tabs and S
     // Video Production: four tabs on each studio, rail link opens the last used tab
     for (const v of ['animation', 'voice', 'lipsync', 'render']) {
       await page.goto(`${base}/#/${v}/${ID}`);
-      await page.waitForSelector('[data-video-tabs]');
+      await until(page, (x) => { const b = document.querySelector('[data-video-tabs] button[aria-selected=true]'); return b && b.getAttribute('data-video-tab') === x; }, v);
       assert.deepEqual(await page.locator('[data-video-tabs] button').allTextContents(), ['1. 애니메이션', '2. 보이스', '3. 립싱크', '4. 편집'], v);
       assert.equal(await page.locator('[data-video-tabs] button[aria-selected=true]').getAttribute('data-video-tab'), v);
     }
@@ -301,11 +300,10 @@ test('Settings has three groups with compact one-line secondary navs; both promp
     // old deep links
     await page.goto(`${base}/#/settings/scriptprompts`);
     await page.waitForSelector('[data-prompt-pane=presets]');
-    assert.equal(await page.locator('[data-settings-sub=ai] [data-settings-tab=prompts]').getAttribute('aria-selected'), 'true');
+    await until(page, () => { const b = document.querySelector('[data-settings-sub=ai] [data-settings-tab=prompts]'); return b && b.getAttribute('aria-selected') === 'true'; });
     for (const [old, group] of [['general', 'general'], ['ai', 'ai'], ['connections', 'ai'], ['voices', 'media'], ['prompts', 'ai'], ['endings', 'media'], ['usage', 'general'], ['characters', 'media']]) {
       await page.goto(`${base}/#/settings/${old}`);
-      await page.waitForSelector(`[data-settings-sub=${group}]`);
-      assert.equal(await page.locator(`[data-settings-sub=${group}] [data-settings-tab=${old}]`).getAttribute('aria-selected'), 'true', '#/settings/' + old);
+      await until(page, ([g, t]) => { const b = document.querySelector(`[data-settings-sub=${g}] [data-settings-tab=${t}]`); return b && b.getAttribute('aria-selected') === 'true'; }, [group, old]).catch((e) => { throw new Error('#/settings/' + old + ': ' + e.message); });
     }
     await page.goto(`${base}/#/characters`);
     await page.waitForSelector('[data-character-library]');
@@ -320,8 +318,7 @@ test('phone width: catalog toolbar, grid, Settings navs and Video Production tab
     const page = await newPage(browser, { width: 390, height: 844 });
     const fits = async (what) => assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1), true, what + ' overflows sideways');
     for (const route of ['products', 'storylab', `products/${ids.withImg}`, `storylab/${ids.withImg}`, 'settings', 'settings/ai', 'settings/prompts', 'settings/characters', `animation/${ID}`, `script/${ID}`]) {
-      await page.goto(`${base}/#/${route}`);
-      await page.waitForSelector('#stage h1, #stage h2');
+      await gotoReady(page, base, route);
       await page.waitForTimeout(400);
       await fits(route);
     }
@@ -346,8 +343,7 @@ test('browsing every route leaves production data and assets exactly as they wer
     const before = snapshot(cfg.studioDir);
     const counts = { products: s.products.list().length, episodes: s.store.episodes.list().length, concepts: s.storylab.list(ids.withImg).concepts.length };
     for (const route of ['products', `products/${ids.withImg}`, 'storylab', `storylab/${ids.withImg}`, `storylab/${ids.zed}`, 'episodes', `script/${ID}`, `image/${ID}`, `animation/${ID}`, `voice/${ID}`, `lipsync/${ID}`, `render/${ID}`, `review/${ID}`, `publishing/${ID}`, 'settings', 'settings/ai', 'settings/prompts', 'settings/autodm', 'settings/characters', 'settings/voices']) {
-      await page.goto(`${base}/#/${route}`);
-      await page.waitForSelector('#stage h1, #stage h2');
+      await gotoReady(page, base, route);
       await page.waitForTimeout(250);
     }
     await page.locator('[data-catalog-search]').count();
