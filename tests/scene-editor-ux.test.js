@@ -170,7 +170,7 @@ test('cancelling discards the proposal; the original scene (and its approval) is
   assert.deepEqual(snap(m), edited, 'the newer edits were not overwritten');
 });
 
-test('bad AI answers are rejected with nothing stored; one regeneration at a time per scene; the locked ending cannot be regenerated; a missing instruction is refused', async () => {
+test('bad AI answers are rejected with nothing stored; one regeneration at a time per scene; any scene of the story can be regenerated (no locked ending); a missing instruction is refused', async () => {
   const bad = await setup({ regen: (req) => { const r = regenAnswer(req); r.scene.lines = [{ speaker: 'ghost', en: 'one two three four five six seven eight nine ten eleven', ko: '긴 대사' }]; return r; } });
   const sid = ep(bad).scenes.find((s) => s.part === 'A').id;
   const before = snap(bad);
@@ -180,8 +180,7 @@ test('bad AI answers are rejected with nothing stored; one regeneration at a tim
   const id2 = ep(m).scenes.find((s) => s.part === 'A').id;
   const [r1, r2] = await Promise.allSettled([m.s.sceneRegen.regenerate(m.id, id2, { visual: 'First concurrent visual direction, long enough.', confirm: CONFIRM }), m.s.sceneRegen.regenerate(m.id, id2, { visual: 'Second concurrent visual direction, long enough.', confirm: CONFIRM })]);
   assert.equal([r1, r2].filter((r) => r.status === 'fulfilled').length, 1); assert.ok([r1, r2].some((r) => r.status === 'rejected' && r.reason.code === 'REGEN_RUNNING'));
-  const b1 = ep(m).scenes.find((s) => s.part === 'B');
-  await assert.rejects(m.s.sceneRegen.regenerate(m.id, b1.id, { visual: 'A long enough visual direction for the ending.', confirm: CONFIRM }), (e) => e.code === 'ENDING_LOCKED');
+  assert.ok(!ep(m).scenes.some((s) => s.part === 'B'), 'no fixed-ending scenes exist, so nothing is locked');
   await assert.rejects(m.s.sceneRegen.regenerate(m.id, id2, { visual: 'short', confirm: CONFIRM }), (e) => e.code === 'NO_INSTRUCTION');
 });
 

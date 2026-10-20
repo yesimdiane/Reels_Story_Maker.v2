@@ -180,7 +180,7 @@ function validateScript(ep, lib) {
   (cta.lines || []).forEach((l) => claimHits(l, forbiddenClaims).forEach((h) => E('PRODUCT_CLAIM', `CTA: 확인되지 않은 제품 주장 "${h.claim}"가 있습니다 (…${h.context}…).`, { field: 'cta.lines' })));
   if (ep.publishing && ep.publishing.keyword && ep.publishing.keyword !== kw) E('KEYWORD_MISMATCH', 'CTA 키워드와 게시 키워드가 다릅니다.', { field: 'cta.keyword' });
   const total = totalPlannedSec(ep);
-  if (total > 90) E('TOO_LONG', `총 길이 ${total.toFixed(1)}초가 인스타그램 릴스 한도(90초)를 넘습니다.`);
+  if (total > 300) E('TOO_LONG', `총 길이 ${total.toFixed(1)}초가 인스타그램 릴스 한도(5분 = 300초)를 넘습니다.`);
   else if (total > 60) W('LONG', `총 길이 ${total.toFixed(1)}초 — 릴스는 보통 60초 이하가 좋습니다.`);
   // The episode's maximum video length (set in Story Lab) is a guide, not a gate: going over only warns; scenes are never stretched or trimmed silently.
   const maxSec = Number(ep.maxDurationSec);

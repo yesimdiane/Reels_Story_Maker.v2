@@ -197,7 +197,7 @@ function createScriptPresets({ store, prompts, seedDir }) {
 
   const api = {
     SECTIONS, LOCKED, DEFAULT_ID,
-    list() { const d = read(); return { activePresetId: d.activePresetId, presets: Object.values(d.presets).map((p) => meta(p, d)), sectionInfo: SECTIONS.map(([key, label, help]) => ({ key, label, help })), locked: LOCKED, lockedFormula: { story: lockedFor('story'), beat: lockedFor('beat'), ending: lockedFor('ending') } }; },
+    list() { const d = read(); return { activePresetId: d.activePresetId, presets: Object.values(d.presets).map((p) => meta(p, d)), sectionInfo: SECTIONS.map(([key, label, help]) => ({ key, label, help })), locked: LOCKED, lockedFormula: { story: lockedFor('story'), beat: lockedFor('beat') } }; },
     get: view,
     versionSections(id, v) { const p = find(read(), id); return ver(p, v).sections; },
     /** Saves a NEW version (history is never rewritten). Unchanged text creates nothing. */

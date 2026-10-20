@@ -131,7 +131,7 @@ test('validation: every beat present, Part A scenes in beat order; no ending rul
   assert.ok(!errs.some((e) => /^ENDING_/.test(e.code)));
 });
 
-test('no structure lock any more: scenes can be added, removed and reordered freely; a scene can never be (re)assigned to Part B', async () => {
+test('no structure lock any more: scenes can be removed and edited freely; a scene can never be (re)assigned to Part B', async () => {
   const { s, id } = await episode();
   await s.scriptgen.generate(id, { confirm: CONFIRM });
   const sc = () => s.store.episodes.get(id).scenes.map((x) => ({ ...x }));
@@ -139,10 +139,12 @@ test('no structure lock any more: scenes can be added, removed and reordered fre
   // removing a scene is allowed (no STRUCTURE_LOCKED)
   await s.saveScript(id, { scenes: sc().filter((x) => x.id !== 'S3') });
   assert.equal(s.store.episodes.get(id).scenes.length, n - 1);
-  // a client cannot create a Part B scene: it is coerced to a Part A beat or dropped
+  // a client cannot create a Part B scene: it belongs to no beat (validation error) or is dropped
   await s.saveScript(id, { scenes: sc().concat([{ id: 'E9', part: 'B', beatKey: 'jack_reaction', title_ko: '추가 컷', durationSec: 3, characters: ['jack'] }]) });
   assert.equal(B(s.store.episodes.get(id)).length, 0);
-  assert.ok(s.store.episodes.get(id).scenes.every((x) => F.BEAT_KEYS.includes(x.beatKey) && x.part === 'A'));
+  const e9 = s.store.episodes.get(id).scenes.find((x) => x.id === 'E9');
+  assert.ok(!e9 || (e9.part !== 'B' && !F.ENDING_KEYS.includes(e9.beatKey)), 'the scene is not part of any ending');
+  assert.ok(!e9 || s.episodeView(id).derived.validation.errors.some((x) => x.code === 'SCENE_BEAT' && x.sceneId === 'E9'), 'a scene that belongs to no beat is a validation error');
   // ordinary content edits still work and are flagged as manual edits
   await s.saveScript(id, { scenes: sc().map((x) => (x.id === 'S1' ? { ...x, visual: 'My own framing of the opening.' } : x)) });
   const e1 = s.store.episodes.get(id).scenes.find((x) => x.id === 'S1');
@@ -343,7 +345,7 @@ test('paid-generation gates are unchanged: every AI action needs confirmation; t
   const { s, id } = await episode(a);
   const calls0 = a.calls.length;
   await assert.rejects(s.scriptgen.generate(id, {}), (e) => e.code === 'CONFIRM_REQUIRED');
-  await assert.rejects(s.scriptgen.regenerate(id, 'twist', {}), (e) => e.code === 'CONFIRM_REQUIRED');
+  await assert.rejects(s.scriptgen.regenerate(id, 'story', {}), (e) => e.code === 'CONFIRM_REQUIRED');
   assert.equal(a.calls.length, calls0, 'no AI call without explicit confirmation');
   await assert.rejects(s.scriptgen.regenerate(id, 'bogus', { confirm: CONFIRM }), (e) => e.code === 'BAD_ACTION');
   await s.scriptgen.generate(id, { confirm: CONFIRM });
