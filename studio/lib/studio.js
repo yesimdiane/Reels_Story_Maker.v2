@@ -473,8 +473,8 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
   const num = (v, d) => (Number.isFinite(Number(v)) && v !== '' && v !== null ? Number(v) : d);
 
   /** Normal path: an episode starts from an APPROVED story concept (Product → Story Lab → episode). */
-  async function createEpisodeFromConcept({ productId, conceptId, id, newVersion = false, requestId = '', approveEndingCast = false }) {
-    const epId = await scriptgen.createEpisodeFromConcept(productId, conceptId, { id, newVersion, requestId, approveEndingCast });
+  async function createEpisodeFromConcept({ productId, conceptId, id, newVersion = false, requestId = '' }) {
+    const epId = await scriptgen.createEpisodeFromConcept(productId, conceptId, { id, newVersion, requestId });
     await charRefs.snapshot(epId);
     store.episodes.audit(epId, 'episode.from_concept', { productId, conceptId, newVersion: !!newVersion });
     return epId;

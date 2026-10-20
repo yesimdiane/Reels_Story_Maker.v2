@@ -79,22 +79,22 @@ test('start images: one call per scene, unapproved AI frames, cast + product rul
   imageRoute(s);
   await approveWithScenes(s, id);
   const ids = s.store.episodes.get(id).scenes.map((x) => x.id);
-  assert.deepEqual(ids, ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'E1', 'E2', 'E3', 'E4']);
+  assert.deepEqual(ids, ['S1', 'S2', 'S3', 'S4', 'S5', 'S6']);
   const est = s.startImages.estimate(id, []);
-  assert.equal(est.count, 10);
+  assert.equal(est.count, 6);
   const r = await s.startImages.generate(id, [], { confirm: CONFIRM });
   assert.deepEqual(r.generated.map((g) => g.sceneId), ids);
   assert.equal(r.failed, null);
   const calls = a.imageCalls();
-  assert.equal(calls.length, 10);
+  assert.equal(calls.length, 6);
   assert.match(calls[0].prompt, /9:16/);
   assert.match(calls[0].prompt, /anime \/ Korean webtoon/);
   assert.match(calls[0].prompt, /Exactly TWO people/);
   assert.match(calls[0].prompt, /Do NOT show the product/);
   assert.equal(calls[0].images.length, 2, 'S1: Jack + Diane references only');
-  assert.match(calls[7].prompt, /EXACTLY like the approved product reference/);
-  assert.equal(calls[7].images.length, 1 + 1, 'E2: Diane reference + the approved product reference');
-  assert.equal(calls[8].images.length, 2 + 1, 'E3: Diane + Jack + the approved product reference');
+  assert.match(calls[5].prompt, /EXACTLY like the approved product reference/);
+  assert.equal(calls[5].images.length, 1 + 1, 'S6 (product_bridge): Diane reference + the approved product reference');
+  calls.slice(0, 5).forEach((c, i) => { assert.doesNotMatch(c.prompt, /EXACTLY like the approved product reference/, 'S' + (i + 1) + ': the product appears only in the product_bridge beat'); });
   const ep = s.store.episodes.get(id);
   ep.scenes.forEach((sc) => { assert.equal(sc.startImage.generated, true); assert.equal(sc.startImage.approved, false); });
   assert.equal(s.episodeView(id).scenes[0].startImageInfo.generated, true);
@@ -103,12 +103,12 @@ test('start images: one call per scene, unapproved AI frames, cast + product rul
   // repeat press: nothing is billed again; the approved frame is never overwritten, even when forced
   const again = await s.startImages.generate(id, [], { confirm: CONFIRM });
   assert.equal(again.generated.length, 0);
-  assert.equal(a.imageCalls().length, 10);
+  assert.equal(a.imageCalls().length, 6);
   const forced = await s.startImages.generate(id, [], { confirm: CONFIRM, force: true });
   assert.deepEqual(forced.generated.map((g) => g.sceneId), ids.slice(1));
   assert.ok(forced.skipped.some((x) => x.sceneId === 'S1'));
   assert.equal(s.store.episodes.get(id).scenes[0].startImage.approved, true);
-  assert.equal(a.imageCalls().length, 10 + 9);
+  assert.equal(a.imageCalls().length, 6 + 5);
 });
 
 test('start images: a failure part-way keeps the frames already made and reports the scene that stopped', async () => {
@@ -124,6 +124,6 @@ test('start images: a failure part-way keeps the frames already made and reports
   // retry only pays for the scenes that are still missing
   const before = a.imageCalls().length;
   const r2 = await s.startImages.generate(id, [], { confirm: CONFIRM });
-  assert.deepEqual(r2.generated.map((g) => g.sceneId), ['S2', 'S3', 'S4', 'S5', 'S6', 'E1', 'E2', 'E3', 'E4']);
-  assert.equal(a.imageCalls().length, before + 9);
+  assert.deepEqual(r2.generated.map((g) => g.sceneId), ['S2', 'S3', 'S4', 'S5', 'S6']);
+  assert.equal(a.imageCalls().length, before + 5);
 });

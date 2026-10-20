@@ -39,7 +39,7 @@ export function timingCard(ep, { d, dirty, redrawAll }) {
   const rows = T.scenes.filter((t) => t.lineCount);
   const bad = rows.filter((t) => t.status !== 'ok');
   const sceneOf = (id) => ep.scenes.find((s) => s.id === id) || {};
-  const shortenable = bad.filter((t) => sceneOf(t.sceneId).part !== 'B');
+  const shortenable = bad;
   const card = h('div', { class: 'card stack' + (bad.length ? ' open' : ''), style: 'gap:10px;min-width:0;max-width:100%' });
   card.append(h('div', { class: 'card-head' }, h('div', null, h('div', { class: 'eyebrow' }, '대사 시간'), h('h3', { style: 'margin:0' }, '대사 시간 점검')),
     bad.length ? chip(`${bad.length}개 장면 넘침 · 합계 ${fmt(T.totalOverSec)}`, T.overflowCount ? 'err' : 'attention') : chip('모든 장면에 들어감 (추정)', 'done')));
@@ -49,16 +49,15 @@ export function timingCard(ep, { d, dirty, redrawAll }) {
     card.append(h('div', { class: 'tbl-wrap', style: 'overflow-x:auto;max-width:100%' }, h('table', { class: 'tbl', style: 'width:100%' }, h('thead', null, h('tr', null, ['장면', '대사 추정', '장면 길이', '초과', '실측(음성)', '해결'].map((x) => h('th', null, x)))),
       h('tbody', null, bad.map((t) => {
         const sc = sceneOf(t.sceneId);
-        const ending = sc.part === 'B';
         const target = Math.ceil(t.needSec * 2) / 2;
         return h('tr', null,
-          h('td', null, h('b', null, t.sceneId), ' ', t.title, ending ? h('div', { class: 'small muted' }, 'PART B 엔딩 컷') : null),
+          h('td', null, h('b', null, t.sceneId), ' ', t.title),
           h('td', null, h('div', null, fmt(t.needSec)), h('div', { class: 'small muted' }, `${t.words}단어 / 예산 ${t.wordBudget}단어`)),
           h('td', null, fmt(t.durationSec)),
           h('td', null, chip(`+${fmt(t.overSec)}`, STATUS[t.status][1])),
           h('td', null, t.actual.complete ? chip(fmt(t.actual.needSec) + (t.actual.mock ? ' (목업)' : ''), t.actual.overSec > 0.05 ? 'err' : 'done') : h('span', { class: 'small muted' }, '음성 전')),
           h('td', null, h('div', { class: 'stack', style: 'gap:6px;align-items:flex-start' },
-            h('button', { class: 'btn sm clay', disabled: ending || !ep.derived.concept.approved, title: ending ? '엔딩 템플릿 컷은 AI가 줄이지 않습니다. 제품별 값을 짧게 고치거나 컷 길이를 늘리세요.' : '넘치는 대사를 AI가 줄입니다 (유료일 수 있음)', onclick: () => fit(ep, [t.sceneId]) }, '대사 줄이기 (AI)'),
+            h('button', { class: 'btn sm clay', disabled: !ep.derived.concept.approved, title: '넘치는 대사를 AI가 줄입니다 (유료일 수 있음)', onclick: () => fit(ep, [t.sceneId]) }, '대사 줄이기 (AI)'),
             h('button', { class: 'btn sm ghost', title: '마지막 수단: 대사는 그대로 두고 장면 길이를 늘립니다 (저장 후 적용)', onclick: () => { const sc2 = d.scenes.find((x) => x.id === t.sceneId); if (sc2) { sc2.durationSec = Math.min(15, target); dirty(); redrawAll(); } } }, `장면을 ${target}초로 늘리기`))));
       })))));
     card.append(h('div', { class: 'row', style: 'flex-wrap:wrap' },

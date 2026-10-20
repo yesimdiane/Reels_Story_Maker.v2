@@ -4,14 +4,14 @@
 // Scene IDs never change; only the order (and, in the formula, the beat a scene is placed in) does.
 const BEAT_ORDER = ['setup', 'problem', 'absurd_escalation', 'unexpected_twist', 'resolution', 'product_bridge'];
 
-export const movable = (ep) => (ep.formula && ep.formula.structured ? ep.scenes.filter((s) => s.part !== 'B') : ep.scenes);
+export const movable = (ep) => ep.scenes;
 export const canMove = (ep, id) => movable(ep).some((s) => s.id === id) && movable(ep).length > 1;
 
 /** toIndex = position the scene should have in the list of movable scenes after the move. */
 export function planReorder(ep, id, toIndex) {
   const mv = movable(ep);
   const from = mv.findIndex((s) => s.id === id);
-  if (from < 0) return { error: { code: 'LOCKED', message: '고정 엔딩 컷은 옮길 수 없습니다.' } };
+  if (from < 0) return { error: { code: 'LOCKED', message: '이 씬은 옮길 수 없습니다.' } };
   const to = Math.max(0, Math.min(mv.length - 1, toIndex));
   if (to === from) return { noop: true };
   const list = mv.map((s) => s.id).filter((x) => x !== id);
@@ -32,7 +32,7 @@ export function planReorder(ep, id, toIndex) {
 /** One step up (-1) or down (+1). */
 export function planStep(ep, id, delta) {
   const i = movable(ep).findIndex((s) => s.id === id);
-  if (i < 0) return { error: { code: 'LOCKED', message: '고정 엔딩 컷은 옮길 수 없습니다.' } };
+  if (i < 0) return { error: { code: 'LOCKED', message: '이 씬은 옮길 수 없습니다.' } };
   return planReorder(ep, id, i + delta);
 }
 

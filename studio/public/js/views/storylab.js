@@ -266,12 +266,8 @@ async function handoff(c, pid, used) {
   }
   let ep;
   const requestId = (window.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
-  const post = (approveEndingCast) => api.post(`/api/storylab/${pid}/concepts/${c.id}/episode`, { newVersion, requestId, approveEndingCast });
-  try { ep = await post(false); } catch (e0) {
-    if (e0.code !== 'ENDING_CAST_MISMATCH') { return toast(e0.message, { error: true, recovery: e0.recovery }); }
-    const okExtra = await confirmDialog({ title: '엔딩에 선택하지 않은 캐릭터가 나옵니다', body: e0.message, confirm: '엔딩 출연을 승인하고 만들기' });
-    if (!okExtra) return;
-    try { ep = await post(true); } catch (e1) { return toast(e1.message, { error: true, recovery: e1.recovery }); }
+  try { ep = await api.post(`/api/storylab/${pid}/concepts/${c.id}/episode`, { newVersion, requestId }); } catch (e0) {
+    return toast(e0.message, { error: true, recovery: e0.recovery });
   }
   state.episodeId = ep.id;
   toast(`에피소드 ${ep.id}를 만들었습니다 (대본은 아직 승인되지 않았습니다)`);

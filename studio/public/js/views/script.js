@@ -36,7 +36,7 @@ export function script() {
   const ctaSave = h('button', { class: 'btn sm', type: 'button', 'data-cta-save': '', disabled: !d.epDirty, onclick: () => saveEpisode() }, d.epDirty ? '에피소드 설정 저장' : '저장됨');
   async function saveEpisode() {
     try {
-      const patch = { title: d.title, titleEn: d.titleEn, beats: d.beats, cta: d.cta, ...(d.comedy_story ? { comedy_story: d.comedy_story, product_ending: d.product_ending, ending: { vars: d.endingVars } } : {}) };
+      const patch = { title: d.title, titleEn: d.titleEn, beats: d.beats, cta: d.cta, ...(d.comedy_story ? { comedy_story: d.comedy_story } : {}) };
       const r = await api.put(`/api/episodes/${ep.id}/script`, patch);
       state.draft.script = null;
       state.episode = r;
@@ -114,9 +114,9 @@ export function script() {
         h('p', { class: 'small muted', style: 'margin:0' }, 'CTA 문구에는 위 키워드가 들어 있어야 합니다. 이모지(☂️ 등)는 캡션에는 남지만 영상 자막으로는 그려지지 않습니다. 내부 상품 ID는 공개 키워드로 쓸 수 없습니다.'))),
     h('div', { class: 'row' }, ctaSave, d.epDirty ? h('span', { class: 'small', style: 'color:var(--clay)' }, '저장하지 않은 에피소드 설정이 있습니다') : null));
   if (wide) {
-    // the CTA box sits right after the card of the last story beat (product bridge); the fixed ending scenes follow it
+    // the CTA box sits right after the card of the last story beat (product bridge)
     const els = cards.map((c) => c.el);
-    const lastBeat = ep.scenes.reduce((at, x, k) => (x.beatKey === 'product_bridge' && x.part !== 'B' ? k : at), -1);
+    const lastBeat = ep.scenes.reduce((at, x, k) => (x.beatKey === 'product_bridge' ? k : at), -1);
     els.splice((lastBeat >= 0 ? lastBeat : els.length - 1) + 1, 0, ctaBox);
     wrap.append(h('div', { class: 'stack scene-list', style: 'gap:16px' }, els));
   }

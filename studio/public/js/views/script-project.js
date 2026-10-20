@@ -112,7 +112,6 @@ export function sceneTools(ep, sc) {
   const scEp = ep.scenes.find((s) => s.id === sc.id);
   if (!scEp) return null;
   const link = scEp.link;
-  const locked = scEp.part === 'B';
   const saveTpl = async () => {
     const name = h('input', { type: 'text', value: `${scEp.title_ko || sc.id} 템플릿`, 'aria-label': '템플릿 이름' });
     if (await confirmDialog({ title: '씬 템플릿으로 저장', body: h('div', { class: 'stack small' }, h('div', { class: 'muted' }, '저장된 내용(저장된 버전)이 템플릿이 됩니다. 이후 이 씬을 고쳐도 템플릿은 바뀌지 않습니다.'), h('div', { class: 'field' }, h('label', null, '이름'), name)), confirm: '저장' })) {
@@ -131,6 +130,6 @@ export function sceneTools(ep, sc) {
   const origin = link ? (link.type === 'template' ? `템플릿 "${link.templateName || link.templateId}" v${link.templateVersion}${link.linked ? ' (링크됨)' : ' (독립 복사본)'}` : `${link.episodeId}/${link.sceneId}에서 복사 (독립 복사본)`) : '';
   return h('details', { class: 'small' }, h('summary', { class: 'muted', style: 'cursor:pointer' }, '재사용 · 복사 · 템플릿' + (origin ? ' — ' + origin : '')),
     h('div', { class: 'row', style: 'flex-wrap:wrap;gap:8px;margin-top:8px' },
-      locked ? h('span', { class: 'small muted' }, '제품 엔딩 컷은 엔딩 템플릿으로 재사용됩니다 (설정 → 엔딩 템플릿 / 에피소드 복제).') : [h('button', { class: 'btn sm ghost', onclick: saveTpl }, '템플릿으로 저장'), h('button', { class: 'btn sm ghost', onclick: copy }, '다른 에피소드로 복사')],
+      [h('button', { class: 'btn sm ghost', onclick: saveTpl }, '템플릿으로 저장'), h('button', { class: 'btn sm ghost', onclick: copy }, '다른 에피소드로 복사')],
       link && link.linked && link.updateAvailable ? h('button', { class: 'btn sm clay', onclick: sync }, '템플릿 최신 버전 가져오기') : null));
 }

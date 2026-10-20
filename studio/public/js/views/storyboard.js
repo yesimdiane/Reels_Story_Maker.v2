@@ -260,7 +260,7 @@ function sceneCard(ep, sc, i, chars, go) {
   const shownPanels = [imageSection, prepSection, brollSection, ...tail];
 
   const el = h('section', { class: 'card sb-scene', id: 'sb-scene-' + sc.id, 'data-sb-scene': sc.id },
-    h('div', { class: 'row between' }, h('div', null, h('div', { class: 'eyebrow' }, `${sc.id} · ${sc.durationSec}초${sc.part ? ' · PART ' + sc.part + (sc.part === 'B' ? ' · 고정 엔딩' : '') : ''}`), h('h2', { style: 'margin:2px 0 0' }, sc.title_ko || sc.title)), addCutBtn),
+    h('div', { class: 'row between' }, h('div', null, h('div', { class: 'eyebrow' }, `${sc.id} · ${sc.durationSec}초${sc.beatKey ? ' · ' + sc.beatKey : ''}`), h('h2', { style: 'margin:2px 0 0' }, sc.title_ko || sc.title)), addCutBtn),
     stepper(ep, sc),
     h('div', { class: 'scene-actions-bar inline sb-actions' }, h('div', { class: 'bar-buttons' }, saveBtn, nextBtn)),
     ...shownPanels);

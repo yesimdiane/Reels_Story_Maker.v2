@@ -157,13 +157,13 @@ export function timelineTab(ep, rerender) {
       const dest = current.find((x) => x.id === at.id);
       if (!moved || !dest || moved.id === dest.id) return;
       const structured = current.some((x) => x.beatKey);
-      if (structured && (moved.part === 'B' || dest.part === 'B' || moved.beatKey !== dest.beatKey)) {
+      if (structured && moved.beatKey !== dest.beatKey) {
         return toast('고정 스토리 구조에서는 같은 비트 안의 씬만 이동할 수 있습니다.', { error: true });
       }
       const ids = current.map((x) => x.id).filter((id) => id !== source);
       const destIdx = ids.indexOf(dest.id);
       ids.splice(destIdx + (targetSec > (at.start + at.end) / 2 ? 1 : 0), 0, source);
-      const payload = structured ? { beats: Object.fromEntries([...new Set(current.filter((x) => x.part !== 'B').map((x) => x.beatKey))].map((k) => [k, ids.filter((id) => (current.find((x) => x.id === id) || {}).beatKey === k)])) } : { order: ids };
+      const payload = structured ? { beats: Object.fromEntries([...new Set(current.map((x) => x.beatKey))].map((k) => [k, ids.filter((id) => (current.find((x) => x.id === id) || {}).beatKey === k)])) } : { order: ids };
       await act(() => api.post(`/api/episodes/${ep.id}/scenes/reorder`, payload), { ok: '씬 순서를 저장했습니다 · 변경된 씬 합본을 다시 검토하세요' });
     }),
     track('음성', total, voice, pick, sel, (key, targetSec) => {

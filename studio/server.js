@@ -190,7 +190,7 @@ function createApp(studio, { token = '', port = 0, host = '127.0.0.1', log = () 
   route('DELETE', '/api/storylab/:pid/concepts/:cid', async ({ p, body }) => S.storylab.remove(p.pid, p.cid, 'operator', { confirmApproved: !!(body && body.confirmApproved) }));
   route('POST', '/api/storylab/:pid/concepts/:cid/restore', async ({ p }) => S.storylab.restore(p.pid, p.cid));
   route('POST', '/api/storylab/:pid/concepts/:cid/reopen', async ({ p }) => S.storylab.reopen(p.pid, p.cid));
-  route('POST', '/api/storylab/:pid/concepts/:cid/episode', async ({ p, body }) => { const id = await S.createEpisodeFromConcept({ productId: p.pid, conceptId: p.cid, newVersion: body.newVersion === true, requestId: String(body.requestId || '').slice(0, 80), approveEndingCast: body.approveEndingCast === true }); return ep(id); });
+  route('POST', '/api/storylab/:pid/concepts/:cid/episode', async ({ p, body }) => { const id = await S.createEpisodeFromConcept({ productId: p.pid, conceptId: p.cid, newVersion: body.newVersion === true, requestId: String(body.requestId || '').slice(0, 80) }); return ep(id); });
 
   // ---- Settings: AI integrations / prompts ----
   route('GET', '/api/ai', async () => S.integrations.overview());

@@ -10,8 +10,6 @@ export function draftOf(ep) {
       scenes: ep.scenes.map((s) => ({ id: s.id, part: s.part, beatKey: s.beatKey, title: s.title, title_ko: s.titleKoMissing ? '' : s.title_ko, legacyTitle: s.title, durationSec: s.durationSec, characters: s.characters.slice(), showsProduct: s.showsProduct, visual: s.visual, beat: s.beat, action: s.action || '', emotion: s.emotion || '', look: Object.assign({}, s.look || {}), pose: Object.assign({}, s.pose || {}), referenceOnly: (s.referenceOnly || []).slice(), elements: Array.isArray(s.elements) ? s.elements.map((e) => Object.assign({}, e)) : undefined, narration: s.narration || '', placement: s.placement || '' })),
       lines: ep.lines.map((l) => ({ ...l })),
       comedy_story: ep.formula.structured ? Object.fromEntries(ep.formula.partA.map((b) => [b.key, { title_ko: b.title_ko, story_en: b.story_en, visual: b.visual }])) : null,
-      product_ending: ep.formula.structured ? Object.fromEntries(ep.formula.partB.map((b) => [b.key, { title_ko: b.title_ko, story_en: b.story_en, visual: b.visual }])) : null,
-      endingVars: ep.formula.structured ? Object.assign({}, ep.formula.ending.vars) : null,
       cta: { lines: ep.cta.lines.slice(), keyword: ep.cta.keyword, durationSec: ep.cta.durationSec },
     };
   }
@@ -37,6 +35,6 @@ export function resetDraftAfterSave(ep, old, savedSids) {
     nd.dirtyScenes.add(sid);
     nd.dirty = true;
   });
-  if (old.epDirty) { ['title', 'titleEn', 'beats', 'cta', 'comedy_story', 'product_ending', 'endingVars'].forEach((k) => { nd[k] = old[k]; }); nd.epDirty = true; }
+  if (old.epDirty) { ['title', 'titleEn', 'beats', 'cta', 'comedy_story'].forEach((k) => { nd[k] = old[k]; }); nd.epDirty = true; }
   return nd;
 }
