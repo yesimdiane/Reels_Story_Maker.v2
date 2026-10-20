@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { loadConfig } = require('../renderer/lib/config');
 const { createStudio } = require('../studio/lib/studio');
+const { gotoReady } = require('./helpers/route-ready');
 const { createApp } = require('../studio/server');
 
 let pw = null;
@@ -43,8 +44,7 @@ test('sidebar shows exactly six items in workflow order (no Script/Animation/Voi
 test('every studio route renders without a console error', { skip, timeout: 180000 }, async () => {
   await withPage(async ({ page, base }) => {
     for (const v of ['products', 'storylab', 'episodes', 'script', 'image', 'animation', 'voice', 'lipsync', 'render', 'review', 'publishing', 'autodm', 'settings']) {
-      await page.goto(`${base}/#/${v}/${v === 'products' || v === 'storylab' || v === 'episodes' || v === 'settings' ? '' : ID}`);
-      await page.waitForSelector('#stage h1, #stage h2');
+      await gotoReady(page, base, `${v}/${v === 'products' || v === 'storylab' || v === 'episodes' || v === 'settings' ? '' : ID}`);
       assert.equal(await page.locator('#stage .banner.err').count(), 0, v + ' rendered an error banner');
     }
   });
@@ -100,8 +100,7 @@ test('moving between the new studios in any order never breaks a view (shared UI
   await withPage(async ({ page, base }) => {
     const order = ['voice', 'image', 'render', 'image', 'lipsync', 'animation', 'voice', 'image', 'render', 'script', 'lipsync', 'image'];
     for (const v of order) {
-      await page.goto(`${base}/#/${v}/${ID}`);
-      await page.waitForSelector('#stage h1, #stage h2');
+      await gotoReady(page, base, `${v}/${ID}`);
       assert.equal(await page.locator('#stage .banner.err').count(), 0, `${v} rendered an error banner after the previous studio`);
     }
   });

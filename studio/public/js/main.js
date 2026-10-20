@@ -158,6 +158,7 @@ export function rerender() {
   }
   const finish = () => { schedulePoll(); placeActionBar(); };
   shownKey = key;
+  stage.dataset.shown = location.hash; // lets tests (and anyone scripting the UI) wait for THIS route instead of the previous route's leftovers
   if (!inPlace) { finish(); return Promise.resolve(); }
   // Resolves once the new view is on screen (or a newer render took over), so `await act(...)` callers see the final DOM.
   return new Promise((resolve) => {
