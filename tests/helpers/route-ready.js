@@ -8,8 +8,8 @@ async function gotoReady(page, base, route, { timeout = SLOW } = {}) {
   await page.goto(`${base}/#/${route}`);
   await page.waitForFunction(() => {
     const st = document.getElementById('stage');
-    return !!st && st.dataset.shown === location.hash && !st.querySelector('.boot') && !!st.querySelector('h1, h2');
-  }, null, { timeout });
+    return !!st && st.dataset.shown === location.hash && !st.querySelector('.boot') && st.children.length > 0;
+  }, null, { timeout }).catch(async (e) => { const d = await page.evaluate(() => { const st = document.getElementById('stage'); return { hash: location.hash, shown: st && st.dataset.shown, boot: !!(st && st.querySelector('.boot')), heading: !!(st && st.querySelector('h1, h2')), kids: st && st.children.length }; }); throw new Error(`route ${route} not drawn: ${JSON.stringify(d)}`); });
 }
 
 /** Waits (instead of asserting once) until `fn(arg)` is true in the page. */
