@@ -372,7 +372,7 @@ function createProjects({ store, episodeIds, lib, products, log = () => {} }) {
     return out;
   }
 
-  return { hooks, migrateAll, listProjects, ensureProject, readiness, assertProjectReady, approveScene, revokeScene, approveReady, sceneHistory, handoff, handoffState, readSnapshot, duplicateEpisode, copyScene, templates, saveTemplate, applyTemplate, syncLinkedScene, sceneLinks, endingCheck };
+  return { hooks, migrateAll, listProjects, ensureProject, readiness, assertProjectReady, approveScene, revokeScene, approveReady, sceneHistory, handoff, handoffState, readSnapshot, duplicateEpisode, copyScene, templates, saveTemplate, applyTemplate, syncLinkedScene, sceneLinks };
 }
 
 module.exports = { createProjects };
