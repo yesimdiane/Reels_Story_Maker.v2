@@ -43,6 +43,18 @@ test('beat card: AI button only, folded fields stay editable, scene buttons show
     // the dialog opens from the button
     await card.locator('[data-beat-refine-open="setup"]').click();
     await page.locator('[data-beat-instruction="setup"]').waitFor();
+    // story-flow dialog: six tabs, free movement, each step keeps its own draft, Korean scene titles / dialogue first, no AI call by browsing
+    const calls0 = ai.calls.length;
+    assert.equal(await page.locator('[data-story-flow] [data-flow-tab]').count(), 6);
+    await page.locator('[data-beat-instruction="setup"]').fill('도입을 더 짧게');
+    await page.locator('[data-flow-tab="resolution"]').click();
+    await page.locator('[data-beat-instruction="resolution"]').waitFor();
+    assert.equal(await page.locator('[data-beat-instruction="resolution"]').inputValue(), '', 'the other step starts empty');
+    const resScene = m.s.store.episodes.get(id).scenes.find((x) => x.beatKey === 'resolution');
+    assert.match(await page.locator(`[data-flow-scene="${resScene.id}"]`).innerText(), new RegExp(resScene.id));
+    await page.locator('[data-flow-tab="setup"]').click();
+    assert.equal(await page.locator('[data-beat-instruction="setup"]').inputValue(), '도입을 더 짧게', 'draft survives tab changes');
+    assert.equal(ai.calls.length, calls0, 'browsing the tabs makes no AI call');
     assert.deepEqual(errors, []);
   } finally { await browser.close(); app.close(); }
 });
