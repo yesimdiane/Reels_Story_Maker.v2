@@ -54,9 +54,9 @@ function createScriptGen({ store, products, storylab, episodeIds, prompts, prese
     const build = ({ id: epId }) => {
     const seed = {
       id: epId, reelId: epId, productId: pid, title: concept.title, titleEn: '', series: rc.universe.name, universeId: rc.universe.id,
-      cast: { universeId: rc.universe.id, characterIds: rc.ids, guest: rc.cast.guest, narrator: rc.cast.narrator, approvedExtras: extras },
+      cast: { universeId: rc.universe.id, characterIds: rc.ids, guest: rc.cast.guest, narrator: rc.cast.narrator, approvedExtras: [] },
       product: { id: pid, name: p.name, kind: p.category || '', verifiedFeatures: b.facts, verifiedBehavior: (b.visualStructure && b.visualStructure.verifiedBehavior) || [], forbiddenClaims: p.forbiddenClaims || [], affiliateUrl: p.affiliateUrl || '', visualSummary: p.description || '', sourceNote: '운영자가 확인한 사실만 사용합니다 (Products 화면).' },
-      characters: rc.ids.concat(extras), beats: [],
+      characters: rc.ids.slice(), beats: [],
       scenes: [], lines: [], suggestions: [],
       cta: { lines: [], durationSec: 3.5, keyword: '' },
       publishing: { keyword: '', affiliateUrl: p.affiliateUrl || '', disclosure: '[광고] 이 게시물은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.' },
