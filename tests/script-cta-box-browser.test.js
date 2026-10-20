@@ -23,7 +23,7 @@ async function open(s, id) {
   return { app, browser, page, errors, base };
 }
 
-test('the CTA box sits between the last story beat and the fixed ending; only the keyword is open; the structure map is at the top', { skip, timeout: 150000 }, async () => {
+test('the CTA box sits right after the last story beat (the end of the scene list); only the keyword is open; the structure map is at the top', { skip, timeout: 150000 }, async () => {
   const { s, id } = await setupEpisode({ concepts: conceptsForPrompt });
   const { app, browser, page, errors } = await open(s, id);
   try {
@@ -44,12 +44,12 @@ test('the CTA box sits between the last story beat and the fixed ending; only th
       };
     });
     assert.equal(layout.inList, true); assert.equal(layout.prevIsScene, true, 'right after a scene card (the last story beat)');
-    assert.equal(layout.nextIsScene, true, 'the ending scenes follow'); assert.equal(layout.nextLocked, true, 'the next card is the fixed ending (locked)');
+    assert.equal(layout.nextIsScene, false, 'nothing follows the CTA box: there is no fixed ending any more');
     assert.equal(layout.keywordHidden, false, 'the keyword is visible without opening anything');
     assert.equal(layout.ctaDetailsOpen, false); assert.equal(layout.ctaLinesHidden, true, 'CTA lines are folded');
     assert.equal(layout.toolsOpen, false); assert.equal(layout.mapInClosedTools, false, 'the structure map is now at the top, not inside the folded tools');
     assert.equal(layout.keywordCountOnPage, 1, 'the keyword field exists once (moved, not duplicated)');
-    const lastA = s.store.episodes.get(id).scenes.filter((x) => x.part !== 'B' && x.beatKey === 'product_bridge').pop();
+    const lastA = s.store.episodes.get(id).scenes.filter((x) => x.beatKey === 'product_bridge').pop();
     assert.ok(lastA, 'the fixture has a product bridge scene');
     assert.equal(await page.evaluate((sid) => document.querySelector('[data-cta-box]').previousElementSibling.querySelector(`[data-scene-handle="${sid}"], [data-rf^="S:${sid}:"]`) !== null || document.querySelector('[data-cta-box]').previousElementSibling.id === 'script-scene-' + sid, lastA.id), true, 'the card before the box is the last product-bridge scene');
     assert.deepEqual(errors, []);

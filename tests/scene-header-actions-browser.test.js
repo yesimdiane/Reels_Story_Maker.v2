@@ -64,7 +64,7 @@ test('scene header: collapse/expand an unapproved scene, delete asks first, a st
   } finally { await browser.close(); app.close(); }
 });
 
-test('deleting the fixed ending: locked -> refused; unlocked -> only a scene that shares its ending shot can go, never the last one of a shot', async () => {
+test('there is no fixed ending: a story step\'s last scene cannot be deleted on the server either', async () => {
   const ai = fakeAi({ '*': (req) => ({ text: '', json: isScriptPrompt(req) ? scriptResponse(req) : conceptsForPrompt(req), usage: { inputTokens: 5, outputTokens: 5 } }) });
   const m = make({ ai });
   const pid = await readyProduct(m.s); routePaid(m.s);
@@ -72,18 +72,12 @@ test('deleting the fixed ending: locked -> refused; unlocked -> only a scene tha
   await m.s.storylab.approve(pid, lab.concepts[0].id);
   const id = await m.s.createEpisodeFromConcept({ productId: pid, conceptId: lab.concepts[0].id });
   await m.s.scriptgen.generate(id, { confirm: CONFIRM });
-  const ep0 = m.s.store.episodes.get(id);
-  const e = ep0.scenes.filter((x) => x.part === 'B');
-  assert.ok(ep0.ending.structureLocked, 'the ending starts locked');
-  await assert.rejects(() => m.s.deleteScene(id, e[0].id), /ENDING_LOCKED|삭제할 수 없습니다/);
-  await m.s.store.episodes.update(id, (ep) => {
-    ep.ending.structureLocked = false;
-    // a shot that was split in two scenes (a long shot is split to stay under 5 s): E4 belongs to the same shot as E3
-    ep.scenes.push({ ...JSON.parse(JSON.stringify(e[2])), id: 'E9', manualEdit: true });
-  });
-  await assert.rejects(() => m.s.deleteScene(id, e[0].id), /SHOT_EMPTY|최소 한 씬/);
-  const before = m.s.store.episodes.get(id).scenes.length;
-  await m.s.deleteScene(id, 'E9');
-  assert.equal(m.s.store.episodes.get(id).scenes.length, before - 1);
-  assert.equal(new Set(m.s.store.episodes.get(id).scenes.filter((x) => x.part === 'B').map((x) => x.beatKey)).size, 3, 'the three ending shots stay');
+  const ep = m.s.store.episodes.get(id);
+  assert.equal(ep.scenes.filter((x) => x.part === 'B').length, 0, 'no ending scenes');
+  const lone = ep.scenes.find((x) => ep.scenes.filter((y) => y.beatKey === x.beatKey).length === 1);
+  assert.ok(lone, 'the fixture has a step with a single scene');
+  await assert.rejects(() => m.s.deleteScene(id, lone.id), /BEAT_EMPTY|최소 한 씬/);
+  const r = await m.s.duplicateScene(id, lone.id);
+  await m.s.deleteScene(id, r.newSceneId); // a step with two scenes can lose one
+  assert.equal(m.s.store.episodes.get(id).scenes.length, ep.scenes.length);
 });
