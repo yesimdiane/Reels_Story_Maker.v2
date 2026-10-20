@@ -756,3 +756,9 @@ body.scene-dragging-body { cursor: grabbing; user-select: none; -webkit-user-sel
 .develop-box { background: var(--card-soft, #f8f4ec); border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); padding: 12px; }
 .review-drop { margin-top: 8px; }
 .review-drop:focus { outline: 2px solid var(--sage-deep); outline-offset: 2px; }
+/* PC (mouse): the rail above already reorders scenes by drag, so the card handle stays out of sight until the card is hovered or the handle is focused.
+   It is only made transparent, never removed: keyboard users (Tab, ↑ ↓) and phones/touch keep it fully visible. */
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .scene-card .scene-handle { opacity: 0; transition: opacity .15s; }
+  .scene-card:hover .scene-handle, .scene-card:focus-within .scene-handle, .scene-handle:focus-visible, .scene-handle:active { opacity: 1; }
+}
