@@ -137,6 +137,15 @@ function section(ep, sid, key, title, { badge = null, errors = 0 } = {}, ...cont
 
 const dragHandle = (sid) => h('button', { class: 'scene-handle', type: 'button', 'data-scene-handle': sid, 'aria-label': `${sid} 씬 순서 바꾸기 (끌어서 옮기거나 위·아래 화살표 키)`, title: '끌어서 순서 바꾸기 · 키보드: ↑ ↓' }, '⋮⋮');
 
+/** 씬 삭제 (card header): refuses up front when it is the last scene of its story step / of the episode (the server enforces the same rule), then asks before deleting. */
+function deleteSceneButton(ep, d, sid, idxOf) {
+  const sc = ep.scenes.find((x) => x.id === sid) || {};
+  const onlyOne = ep.formula && ep.formula.structured ? ep.scenes.filter((x) => x.part === sc.part && x.beatKey === sc.beatKey).length <= 1 : ep.scenes.length <= 1;
+  return h('button', { class: 'btn sm danger', type: 'button', 'data-scene-delete': sid, title: '이 씬 삭제 (확인 후 삭제)', onclick: async () => {
+    if (onlyOne) return toast('이 단계(컷)에는 씬이 최소 1개 있어야 해서 삭제할 수 없습니다. 먼저 새 씬을 추가한 뒤 삭제하세요.', { error: true });
+    if (isDirty(d)) return toast('저장하지 않은 변경이 있습니다. 먼저 저장하세요.', { error: true }); if (await confirmDialog({ title: `${sid} 씬을 삭제할까요?`, body: '이 씬의 대사도 함께 삭제됩니다. 만든 클립·이미지 파일과 승인 기록은 지워지지 않습니다.', tone: 'clay', confirm: '삭제' })) { try { const r = await api.del(`/api/episodes/${ep.id}/scenes/${sid}`); setFocus(ep, (r.scenes[Math.max(0, idxOf - 1)] || r.scenes[0] || {}).id); state.draft.script = null; state.episode = r; await refresh(); hooks.rerender(); toast('씬을 삭제했습니다'); } catch (e) { toast(e.message, { error: true, recovery: e.recovery }); } } } }, icon('trash'), '삭제');
+}
+
 /** Approved scene folded into one compact row: number, duration, title, status, short preview. Approval data is untouched; 펼치기 shows the full editor again. */
 function compactScene(ep, d, sid, sc, ap, ctx, draggable, lockedB) {
   const idx = ep.scenes.findIndex((x) => x.id === sid);
@@ -144,7 +153,7 @@ function compactScene(ep, d, sid, sc, ap, ctx, draggable, lockedB) {
   const handle = draggable ? dragHandle(sid) : null;
   const el = h('div', Object.assign({ class: 'card scene-card scene-compact', id: 'script-scene-' + sid, 'data-scene-card': sid, 'data-collapsed': '' }, lockedB ? { 'data-scene-locked': '' } : {}),
     h('div', { class: 'scene-head' },
-      h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap;min-width:0' }, handle, h('span', { class: 'scene-no eyebrow' }, `씬 ${idx + 1}`), h('span', { class: 'small muted' }, sid), chip(`${sc.durationSec}초`, ''), chip(`승인됨 r${ap.revision}`, 'done')),
+      h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap;min-width:0' }, handle, h('span', { class: 'scene-no eyebrow' }, `씬 ${idx + 1}`), h('span', { class: 'small muted' }, sid), chip(`${sc.durationSec}초`, ''), ap && ap.approved ? chip(`승인됨 r${ap.revision}`, 'done') : statusChip(ap)),
       h('button', { class: 'btn sm ghost', type: 'button', 'data-scene-expand': sid, 'aria-expanded': 'false', onclick: () => { setCollapsed(ep.id, sid, false); hooks.rerender(); } }, '펼치기')),
     h('div', { class: 'scene-title-compact' }, h('b', null, sc.title_ko || sc.title || sid)),
     h('div', { class: 'small muted scene-desc' }, short(sc.visual, 140) || short(first.ko || first.en, 140) || '—'));
@@ -166,7 +175,7 @@ export function sceneFocus(ep, d, ctx, sceneId, { inline = false } = {}) {
   const lockedB = ep.formula.structured && sc.part === 'B' && ep.formula.ending.structureLocked;
   // plain-language change request for "씬 다시 생성하기" (optional): e.g. make Diane's reaction more playful. Not part of the scene data, so it is never saved with it.
   const noteIn = h('input', { type: 'text', maxlength: 1000, 'data-scene-note': sid, 'aria-label': '이 씬 변경 요청 (선택)', placeholder: '고치고 싶은 내용 (선택) — 예: 다이앤의 표정을 더 장난스럽게', style: 'flex:1;min-width:220px' });
-  if (ap && ap.approved && collapsedNow(ep.id, sid) && !d.dirtyScenes.has(sid) && !(ep.sceneRegen || {})[sid]) return compactScene(ep, d, sid, sc, ap, ctx, canMove(ep, sid), lockedB);
+  if (collapsedNow(ep.id, sid) && !d.dirtyScenes.has(sid) && !(ep.sceneRegen || {})[sid]) return compactScene(ep, d, sid, sc, ap, ctx, canMove(ep, sid), lockedB);
   const errCount = (fields) => (index.errors || []).filter((e) => (e.sceneId === sid || (e.lineId && d.lines.some((l) => l.id === e.lineId && l.sceneId === sid))) && fields.includes(SECTION_OF[e.field] || '')).length;
 
   // ---- action bar (씬 저장 / 씬 승인): the sticky bar and the inline (desktop) buttons share their handlers and state ----
@@ -293,8 +302,7 @@ export function sceneFocus(ep, d, ctx, sceneId, { inline = false } = {}) {
     meter2,
     h('div', { class: 'eyebrow' }, '0.5초 비주얼 비트 타임라인 (Storyboard와 같은 데이터)'), isDirty(d) ? h('div', { class: 'small muted' }, '장면 길이를 바꿨다면 먼저 "씬 저장"을 누르세요 — 비트는 저장된 장면 길이를 기준으로 검증됩니다.') : null, motionPanel(ep, srv),
     sceneTools(ep, sc),
-    ap && ap.history.length ? h('div', { class: 'stack', style: 'gap:6px' }, h('div', { class: 'eyebrow' }, `승인 기록 (${ap.history.length}개 버전)`), ap.history.slice().reverse().map((v) => h('div', { class: 'scene-version small' }, h('b', null, `r${v.rev}`), ` · ${new Date(v.at).toLocaleString('ko-KR')} · ${v.by}${v.revokedAt ? ' · 취소됨' : v.supersededAt ? ' · 새 버전으로 대체됨' : v.current ? ' · 현재 승인본' : ''}`))) : null,
-    lockedB ? null : h('button', { class: 'btn sm danger', type: 'button', onclick: async () => { if (isDirty(d)) return toast('저장하지 않은 변경이 있습니다. 먼저 저장하세요.', { error: true }); if (await confirmDialog({ title: `${sid} 씬을 삭제할까요?`, body: '이 씬의 대사도 함께 삭제됩니다. 만든 클립·이미지 파일과 승인 기록은 지워지지 않습니다.', tone: 'clay', confirm: '삭제' })) { try { const r = await api.del(`/api/episodes/${ep.id}/scenes/${sid}`); setFocus(ep, (r.scenes[Math.max(0, idxOf - 1)] || r.scenes[0] || {}).id); state.draft.script = null; state.episode = r; await refresh(); hooks.rerender(); toast('씬을 삭제했습니다'); } catch (e) { toast(e.message, { error: true, recovery: e.recovery }); } } } }, icon('trash'), '이 씬 삭제'));
+    ap && ap.history.length ? h('div', { class: 'stack', style: 'gap:6px' }, h('div', { class: 'eyebrow' }, `승인 기록 (${ap.history.length}개 버전)`), ap.history.slice().reverse().map((v) => h('div', { class: 'scene-version small' }, h('b', null, `r${v.rev}`), ` · ${new Date(v.at).toLocaleString('ko-KR')} · ${v.by}${v.revokedAt ? ' · 취소됨' : v.supersededAt ? ' · 새 버전으로 대체됨' : v.current ? ' · 현재 승인본' : ''}`))) : null);
 
   // ---- header + summary ----
   const desc = h('div', { class: 'scene-desc' });
@@ -312,9 +320,9 @@ export function sceneFocus(ep, d, ctx, sceneId, { inline = false } = {}) {
   const el = h('div', Object.assign({ class: 'card scene-card', id: 'script-scene-' + sid, 'data-rf': `S:${sid}:block`, 'data-scene-card': sid }, lockedB ? { 'data-scene-locked': '' } : {}),
     h('div', { class: 'scene-head' },
       h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap;min-width:0' }, canMove(ep, sid) ? dragHandle(sid) : null, h('span', { class: 'scene-no eyebrow' }, `씬 ${idxOf + 1}`), h('span', { class: 'small muted' }, sid), statusChip(ap),
-        ap && ap.approved ? h('button', { class: 'btn sm ghost', type: 'button', 'data-scene-collapse': sid, onclick: () => { setCollapsed(ep.id, sid, true); hooks.rerender(); } }, '접기') : null),
-      h('div', { class: 'row', style: 'gap:6px' }, sc.part !== 'B' ? h('button', { class: 'btn sm ghost', type: 'button', 'data-dup-scene': sid, title: '이 씬을 그대로 복사해 바로 뒤에 미승인 상태로 만듭니다', onclick: () => ctx.duplicateScene(sid) }, '⎘ 씬 복제') : null,
-      h('button', { class: 'btn sm clay', type: 'button', 'data-add-scene': sid, title: '현재 씬 바로 뒤에 새 씬을 만듭니다 (기존 씬은 바뀌지 않습니다)', onclick: () => ctx.addScene(sid) }, icon('plus'), '씬 추가'))),
+        null),
+      h('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, h('button', { class: 'btn sm ghost', type: 'button', 'data-scene-collapse': sid, 'aria-expanded': 'true', title: '이 씬을 한 줄로 접습니다 (저장 안 된 변경이 있으면 접히지 않습니다)', onclick: () => { if (d.dirtyScenes.has(sid)) return toast('저장하지 않은 변경이 있습니다. 먼저 씬 저장 후 접으세요.', { error: true }); setCollapsed(ep.id, sid, true); hooks.rerender(); } }, '∧ 접기'), sc.part !== 'B' ? h('button', { class: 'btn sm ghost', type: 'button', 'data-dup-scene': sid, title: '이 씬을 그대로 복사해 바로 뒤에 미승인 상태로 만듭니다', onclick: () => ctx.duplicateScene(sid) }, '⎘ 씬 복제') : null,
+      h('button', { class: 'btn sm clay', type: 'button', 'data-add-scene': sid, title: '현재 씬 바로 뒤에 새 씬을 만듭니다 (기존 씬은 바뀌지 않습니다)', onclick: () => ctx.addScene(sid) }, icon('plus'), '씬 추가'), lockedB ? null : deleteSceneButton(ep, d, sid, idxOf))),
     attach(index, h('div', { class: 'field', style: 'margin:0' }, h('input', { type: 'text', class: 'scene-title', value: sc.title_ko, placeholder: sc.legacyTitle ? '한국어 제목 입력 (현재: ' + sc.legacyTitle + ')' : '한국어 장면 제목 (예: 영국인의 자신감)', maxLength: 24, 'aria-label': '장면 제목 (한국어)', oninput: (e) => { sc.title_ko = e.target.value; dirty(); } })), `S:${sid}:title_ko`),
     h('div', { class: 'scene-summary' }, h('div', { class: 'scene-summary-text' }, desc, dlgSummary,
       chipRow)),

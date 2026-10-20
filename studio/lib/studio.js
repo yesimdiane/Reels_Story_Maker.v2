@@ -1115,8 +1115,11 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
       const sc = ep.scenes.find((x) => x.id === sceneId);
       if (!sc) throw new StudioError('NOT_FOUND', '장면을 찾을 수 없습니다: ' + sceneId, { status: 404 });
       if (F.isStructured(ep)) {
-        if (sc.part === 'B') throw new StudioError('ENDING_LOCKED', '고정 제품 엔딩 컷은 삭제할 수 없습니다.', { status: 409 });
-        if (ep.scenes.filter((x) => x.part === 'A' && x.beatKey === sc.beatKey).length <= 1) throw new StudioError('BEAT_EMPTY', '각 스토리 단계에는 최소 한 씬이 필요합니다. 이 씬이 이 단계의 마지막 씬입니다.', { status: 422 });
+        if (sc.part === 'B') {
+          // the fixed ending can be trimmed only after its structure lock is released, and never below one scene per ending shot (shopping excuse → demo → Jack's reaction)
+          if (ep.ending && ep.ending.structureLocked) throw new StudioError('ENDING_LOCKED', '고정 제품 엔딩 컷은 삭제할 수 없습니다. 엔딩의 "구조 잠금"을 해제하면 같은 컷에 나뉜 씬을 지울 수 있습니다.', { status: 409 });
+          if (ep.scenes.filter((x) => x.part === 'B' && x.beatKey === sc.beatKey).length <= 1) throw new StudioError('SHOT_EMPTY', '엔딩의 각 컷(핑계 · 제품 시연 · 잭의 반응)에는 최소 한 씬이 필요합니다. 이 씬이 이 컷의 마지막 씬입니다.', { status: 422 });
+        } else if (ep.scenes.filter((x) => x.part === 'A' && x.beatKey === sc.beatKey).length <= 1) throw new StudioError('BEAT_EMPTY', '각 스토리 단계에는 최소 한 씬이 필요합니다. 이 씬이 이 단계의 마지막 씬입니다.', { status: 422 });
       } else if (ep.scenes.length <= 1) throw new StudioError('LAST_SCENE', '마지막 씬은 삭제할 수 없습니다.', { status: 422 });
       const i = ep.scenes.indexOf(sc);
       ep.scenes.splice(i, 1);
