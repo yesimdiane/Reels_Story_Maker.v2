@@ -34,10 +34,14 @@ test('beat card: instruction required, unsaved changes block it, cost confirmati
     await page.goto(`http://127.0.0.1:${app.address().port}/#/script/${id}`);
     await page.waitForSelector('[data-episode-tools]');
     await page.locator('[data-episode-tools] > summary').click();
-    for (const k of ['setup', 'problem', 'absurd_escalation', 'unexpected_twist', 'resolution', 'product_bridge']) assert.equal(await page.locator(`[data-beat-refine="${k}"]`).count(), 1, k + ' has its own instruction box');
+    for (const k of ['setup', 'problem', 'absurd_escalation', 'unexpected_twist', 'resolution', 'product_bridge']) assert.equal(await page.locator(`[data-beat-refine-open="${k}"]`).count(), 1, k + ' has its own 🪄 AI로 다듬기 button');
+    assert.equal(await page.locator('textarea[data-beat-instruction]').count(), 0, 'no instruction textarea sits in the cards any more');
+    const openBox = async () => { await page.locator('[data-beat-refine-open="resolution"]').click(); await page.locator('[data-beat-instruction="resolution"]').waitFor(); };
+    const closeBox = async () => { await page.locator('[data-beat-refine-box] button', { hasText: '취소' }).click(); await page.waitForFunction(() => !document.querySelector('[data-beat-refine-box]')); };
     const btn = page.locator('[data-beat-refine="resolution"]');
     // no instruction -> refused on the spot, no AI call
     const n0 = scriptCalls(a).length;
+    await openBox();
     await btn.click();
     await page.waitForSelector('.toast.err');
     assert.equal(scriptCalls(a).length, n0);
@@ -47,10 +51,12 @@ test('beat card: instruction required, unsaved changes block it, cost confirmati
     await btn.click();
     await page.waitForFunction(() => /저장하지 않은 변경/.test(document.body.innerText));
     assert.equal(scriptCalls(a).length, n0, 'blocked by the unsaved change');
+    await closeBox();
     await page.locator('[data-cta-save]').click();
     await page.waitForFunction(() => document.querySelector('[data-cta-save]') && document.querySelector('[data-cta-save]').disabled);
     // cancel at the cost dialog: nothing is sent, the button comes back
     await page.locator('[data-episode-tools] > summary').evaluate((e) => { if (!e.parentElement.open) e.click(); });
+    await openBox();
     await page.locator('[data-beat-instruction="resolution"]').fill('결말을 더 따뜻하게 바꿔줘');
     await btn.click();
     await cost().waitFor();
@@ -60,6 +66,8 @@ test('beat card: instruction required, unsaved changes block it, cost confirmati
     // confirm, request held -> busy
     let release; const gate = new Promise((r) => { release = r; });
     await page.route('**/script/regenerate', async (route) => { await gate; await route.continue(); });
+    await openBox();
+    await page.locator('[data-beat-instruction="resolution"]').fill('결말을 더 따뜻하게 바꿔줘');
     await btn.click();
     await cost().waitFor();
     await cost().locator('input[type=checkbox]').check();
