@@ -95,18 +95,21 @@ test('the episode maximum video length is only a guide: going over warns but nev
   assert.deepEqual(codes(m.s.episodeView(m.id).derived.validation), { err: false, warn: false });
 });
 
-test('every newly created episode category uses the six-beat story and reusable shopping ending', async () => {
+test('every newly created episode category uses the six-beat story and no fixed ending', async () => {
   const d = await setup('drama');
   const dep = d.s.store.episodes.get(d.id);
-  assert.ok(dep.comedy_story && dep.product_ending, 'drama: six-beat story + reusable ending');
+  assert.ok(dep.comedy_story, 'drama: six-beat story');
+  assert.equal(dep.product_ending, undefined, 'drama: no fixed ending');
   for (const category of ['viral', 'info']) {
     const m = await setup(category);
     const ep = m.s.store.episodes.get(m.id);
     assert.ok(ep.comedy_story, category + ': six beats');
-    assert.ok(ep.product_ending, category + ': fixed product ending');
+    assert.equal(ep.product_ending, undefined, category + ': no fixed product ending');
+    assert.equal(ep.ending, undefined, category + ': no ending settings');
     assert.deepEqual(Object.keys(ep.comedy_story).length, 6);
     assert.ok(ep.scenes.length > 0 && ep.lines.length > 0);
-    assert.ok(ep.scenes.some((s) => s.part === 'B'));
+    assert.ok(ep.scenes.every((s) => s.part === 'A'), category + ': no Part B scenes');
+    assert.ok(ep.scenes.some((s) => s.beatKey === 'product_bridge' && s.showsProduct), category + ': the product is shown in the product bridge');
     // and it can go all the way to the hand-off
     await approveWithScenes(m.s, m.id);
     const ho = await m.s.projects.handoff(m.id);
