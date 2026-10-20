@@ -330,7 +330,15 @@ button.issue-link:focus-visible { outline: 2px solid var(--rose); outline-offset
 .scene-chip.has-err { border-color: var(--rose); }
 .scene-chip.dragging { opacity: .45; }
 .ref-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line-strong); }
-@media (max-width: 1100px) { .beat-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .beat-columns:not(.single) { grid-template-columns: repeat(6, minmax(150px, 1fr)); overflow-x: auto; padding-bottom: 6px; } }
+.beat-title { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.beat-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn-step-add { font-size: 11px; background: transparent; border: 0; color: var(--clay, #7c5e3d); cursor: pointer; padding: 2px 4px; white-space: nowrap; }
+.btn-step-add:hover { text-decoration: underline; }
+.scene-chip.insert-before { box-shadow: 0 -3px 0 0 var(--clay, #8c5b36); }
+.scene-chip.insert-after { box-shadow: 0 3px 0 0 var(--clay, #8c5b36); }
+.scene-card.highlight-flash { animation: sceneFlash 1.2s ease-out; }
+@keyframes sceneFlash { 0% { background-color: rgba(184, 93, 59, .18); } 100% { background-color: transparent; } }
 
 /* ---------- insert shots (컷 추가) editor ---------- */
 .cut-timeline { position: relative; height: 30px; border-radius: 10px; background: repeating-linear-gradient(90deg, var(--paper), var(--paper) 9px, #efe7d8 9px, #efe7d8 10px); border: 1px solid var(--line-strong); }

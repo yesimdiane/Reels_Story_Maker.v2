@@ -8,7 +8,7 @@ import { api } from '../api.js';
 
 const short = (t, n = 12) => { const s = String(t || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 
-export function structureMap(ep, { dirty }) {
+export function structureMap(ep, { dirty, addSceneIn, openScene }) {
   const F = ep.formula;
   const root = h('div', { class: 'card structure-map stack', style: 'gap:10px', 'data-structure-map': ep.id },
     h('div', { class: 'card-head', style: 'margin-bottom:0' }, h('div', null, h('div', { class: 'eyebrow' }, '스토리 구조'), h('h3', null, '장면 순서 (드래그해서 바꾸기)')), h('span', { class: 'small muted' }, '장면 칩을 끌어 놓으면 순서와 단계가 바뀝니다')));
@@ -20,7 +20,7 @@ export function structureMap(ep, { dirty }) {
       h('b', null, sc.id), ' ', short(sc.title_ko), ap.approved ? h('span', { class: 'tab-badge ok' }, '✓') : ap.errorCount ? h('span', { class: 'tab-badge err' }, String(ap.errorCount)) : null);
     el.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', sc.id); e.dataTransfer.effectAllowed = 'move'; el.classList.add('dragging'); });
     el.addEventListener('dragend', () => el.classList.remove('dragging'));
-    el.addEventListener('click', () => { const b = document.getElementById('script-scene-' + sc.id); if (b) b.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+    el.addEventListener('click', () => { if (openScene) openScene(sc.id); });
     return el;
   };
 
@@ -37,11 +37,19 @@ export function structureMap(ep, { dirty }) {
   };
   function zone(key, ids) {
     const z = h('div', { class: 'drop-zone', 'data-beat': key || 'all' }, ids.map((id) => chipFor(sceneOf(id))));
-    z.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; z.classList.add('over'); });
-    z.addEventListener('dragleave', () => z.classList.remove('over'));
+    const clearMarks = () => z.querySelectorAll('.scene-chip').forEach((c) => c.classList.remove('insert-before', 'insert-after'));
+    z.addEventListener('dragover', (e) => {
+      e.preventDefault(); e.dataTransfer.dropEffect = 'move'; z.classList.add('over');
+      // show where the scene will be inserted (it is inserted, never swapped)
+      clearMarks();
+      const chips = Array.from(z.querySelectorAll('.scene-chip:not(.dragging)'));
+      const i = indexAt(z, e, '');
+      if (chips.length) (i < chips.length ? chips[i].classList.add('insert-before') : chips[chips.length - 1].classList.add('insert-after'));
+    });
+    z.addEventListener('dragleave', (e) => { if (e.relatedTarget && z.contains(e.relatedTarget)) return; z.classList.remove('over'); clearMarks(); });
     z.addEventListener('drop', (e) => {
       e.preventDefault();
-      z.classList.remove('over');
+      z.classList.remove('over'); clearMarks();
       const id = e.dataTransfer.getData('text/plain');
       if (!sceneOf(id)) return;
       if (F.structured) {
@@ -49,16 +57,8 @@ export function structureMap(ep, { dirty }) {
         const srcKey = sceneOf(id).beatKey;
         const beats = Object.fromEntries(F.partA.map((b) => [b.key, b.sceneIds.slice()]));
         const idx = indexAt(z, e, id);
-        const targetChip = e.target.closest && e.target.closest('.scene-chip');
-        const targetId = targetChip ? targetChip.dataset.scene : (beats[key].filter((x) => x !== id)[Math.min(idx, beats[key].filter((x) => x !== id).length - 1)] || '');
-        // the only scene of a beat dropped onto another scene: swap the two (a beat can never be left empty)
-        if (key !== srcKey && beats[srcKey].length === 1 && targetId && targetId !== id) {
-          const ti = beats[key].indexOf(targetId);
-          beats[key][ti] = id;
-          beats[srcKey] = [targetId];
-          send({ beats });
-          return;
-        }
+                // scenes are inserted, never swapped: a beat's only scene cannot leave it (every beat keeps at least one scene)
+        if (key !== srcKey && beats[srcKey].length === 1) return toast('이 단계의 유일한 씬입니다. 단계마다 씬이 최소 한 개 필요하니, 먼저 이 단계에 씬을 추가한 뒤 옮기세요.', { error: true });
         beats[srcKey] = beats[srcKey].filter((x) => x !== id);
         beats[key] = beats[key].filter((x) => x !== id);
         beats[key].splice(idx, 0, id);
@@ -74,7 +74,7 @@ export function structureMap(ep, { dirty }) {
 
   if (F.structured) {
     root.append(h('div', { class: 'eyebrow' }, 'PART A — 이번 에피소드 이야기'));
-    root.append(h('div', { class: 'beat-columns' }, F.partA.map((b) => h('div', { class: 'beat-col' }, h('div', { class: 'beat-title' }, h('b', null, b.label), h('span', { class: 'small muted' }, ' ' + b.labelEn)), zone(b.key, b.sceneIds)))));
+    root.append(h('div', { class: 'beat-columns' }, F.partA.map((b) => h('div', { class: 'beat-col' }, h('div', { class: 'beat-title' }, h('span', { class: 'beat-title-text' }, h('b', null, b.label), h('span', { class: 'small muted' }, ' ' + b.labelEn)), addSceneIn ? h('button', { class: 'btn-step-add', type: 'button', 'data-beat-add': b.key, title: `${b.label} 단계에 새 씬 추가`, onclick: () => addSceneIn(b.key) }, '+ 추가') : null), zone(b.key, b.sceneIds)))));
     const imgs = (ep.productRefImages && ep.productRefImages.length ? ep.productRefImages : (ep.productStudioImages || []).filter((i) => i.status === 'approved'));
     root.append(h('div', { class: 'eyebrow', style: 'margin-top:4px' }, 'PART B — 고정 제품 엔딩 (' + F.partB.map((b) => b.sceneIds.join('·')).join(' / ') + ')'));
     root.append(h('div', { class: 'row', style: 'gap:10px;flex-wrap:wrap;align-items:center' },
