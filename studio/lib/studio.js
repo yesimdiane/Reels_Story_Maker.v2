@@ -880,7 +880,18 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
       { key: 'storyboard', label: '스토리보드', ok: !!(steps.find((x) => x.key === 'storyboard') || {}).state && steps.find((x) => x.key === 'storyboard').state === 'done' },
       { key: 'final', label: '최종', ok: !!(ep.approvals && ep.approvals.final) },
     ];
+    const PHASES = [['script', '대본', ['product', 'concept', 'script', 'approval']], ['image', '이미지', ['storyboard']], ['video', '영상 제작', ['estimate', 'animation', 'clips', 'voice']], ['review', '최종 검토', ['render', 'review']], ['publish', '게시', ['publish']]];
+    let phaseCur = false;
+    const phases = PHASES.map(([key, label, keys]) => {
+      const mine = steps.filter((x) => keys.includes(x.key));
+      const done = mine.length > 0 && mine.every((x) => x.state === 'done');
+      const state = done ? 'done' : !phaseCur ? 'current' : 'todo';
+      if (!done) phaseCur = true;
+      return { key, label, state, done: mine.filter((x) => x.state === 'done').length, total: mine.length };
+    });
+    const progressPct = steps.length ? Math.round(100 * steps.filter((x) => x.state === 'done').length / steps.length) : 0;
     return {
+      phases, progressPct,
       code: ep.displayId || ep.id, title: ep.title, productName: (ep.product || {}).name || '', productCode: ep.productCode || '', category: ep.category || (ep.concept && ep.concept.category) || '',
       stage: cur ? { key: cur.key, label: cur.label, state: cur.state } : { key: 'done', label: '완료', state: 'done' },
       approvals, approvedCount: approvals.filter((a) => a.ok).length,
