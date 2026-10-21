@@ -1,15 +1,12 @@
-// Mechanics of the fixed episode formula: building/refreshing Part B from the ending template, replacing Part A (or one beat),
+// Mechanics of the episode formula (six beats): replacing the story (or one beat),
 // validating AI output and tracking manual edits. Pure functions over an episode object (callers do the persistence).
 'use strict';
 const { StudioError } = require('./util');
-const { checkTitleKo, speechNeed } = require('./episode');
+const { checkTitleKo } = require('./episode');
 const F = require('./formula');
-const { defaultVars, VAR_KEYS } = require('./endingtemplates');
 
 const SCENE_FIELDS = ['title_ko', 'visual', 'action', 'narration', 'placement', 'durationSec', 'showsProduct'];
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-
-const endingVars = (ep) => Object.assign(defaultVars(ep.product, { neutral: !!(ep.universeId && ep.universeId !== 'jackdiane') }), (ep.ending && ep.ending.vars) || {});
 
 function freeIds(used, n, prefix) {
   const out = [];
@@ -32,84 +29,17 @@ function pushLines(ep, sceneId, lines) {
 }
 const dropScene = (ep, id) => { ep.scenes = ep.scenes.filter((s) => s.id !== id); ep.lines = ep.lines.filter((l) => l.sceneId !== id); };
 
-/** Part A scenes first (their order is kept), then Part B in the fixed ending order. */
+/** Scenes stay in beat order (there is no Part B any more). Kept as a function so callers do not change. */
 function orderScenes(ep) {
-  const a = ep.scenes.filter((s) => s.part !== 'B');
-  const b = [].concat(...F.ENDING_KEYS.map((k) => ep.scenes.filter((s) => s.part === 'B' && s.beatKey === k)));
-  const rest = ep.scenes.filter((s) => s.part === 'B' && !F.ENDING_KEYS.includes(s.beatKey));
-  ep.scenes = a.concat(b, rest);
+  ep.scenes = ep.scenes.filter((s) => s.part !== 'B');
 }
 
-/** A template shot longer than the episode's per-scene limit becomes consecutive scenes (same beat, equal length, lines kept in order). */
-function splitShot(shot, maxSec) {
-  const n = Math.max(1, Math.ceil(shot.durationSec / maxSec - 1e-9));
-  if (n === 1) return [shot];
-  const per = Math.round((shot.durationSec / n) * 100) / 100;
-  // Contiguous line groups that balance the estimated speaking time (dialogue never changes order or wording).
-  const L = shot.lines; const cuts = [0];
-  const cost = (from, to) => speechNeed(L.slice(from, to));
-  if (L.length >= n) {
-    let best = null;
-    const rec = (start, left, acc) => {
-      if (left === 1) { const all = acc.concat([[start, L.length]]); const worst = Math.max(...all.map(([x, y]) => cost(x, y))); if (!best || worst < best.worst) best = { worst, all }; return; }
-      for (let e = start + 1; e <= L.length - (left - 1); e++) rec(e, left - 1, acc.concat([[start, e]]));
-    };
-    rec(0, n, []);
-    best.all.forEach(([, y]) => cuts.push(y));
-  } else for (let i = 1; i <= n; i++) cuts.push(i <= L.length ? i : L.length);
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    const tag = i === 0 ? `Part 1 of ${n} (first ${per}s of the shot): ` : `Part ${i + 1} of ${n} (continues directly from the previous part, same setting and framing): `;
-    out.push(Object.assign({}, shot, { durationSec: per, action: tag + (shot.action || ''), lines: L.slice(cuts[i], cuts[i + 1]) }));
-  }
-  return out;
-}
-
-/**
- * (Re)builds Part B from the selected ending template + the episode's product-specific variables.
- * A shot the operator edited by hand (manualEdit) is kept exactly as it is, unless respectEdits is false.
- */
-function applyEnding(ep, endings, { respectEdits = true } = {}) {
-  const sel = ep.ending || (ep.ending = { templateId: endings.activeId(), version: null, vars: {}, manualVars: [] });
-  const inst = endings.instantiate({ templateId: sel.templateId, version: sel.version }, endingVars(ep));
-  sel.structureLocked = inst.structureLocked;
-  sel.templateName = inst.templateName;
-  sel.templateVersion = inst.templateVersion;
-  const kept = [];
-  const maxSec = ep.durationPolicy && ep.durationPolicy.maxSceneSec === 5 ? 5 : 0;
-  inst.shots.forEach((shot) => {
-    const existing = ep.scenes.filter((s) => s.part === 'B' && s.beatKey === shot.beatKey);
-    if (existing.some((s) => s.manualEdit) && respectEdits) { kept.push(shot.beatKey); return; }
-    const keepFrame = existing[0] && existing[0].startImage;
-    existing.forEach((s) => dropScene(ep, s.id));
-    const parts = maxSec && shot.durationSec > maxSec ? splitShot(shot, maxSec) : [shot];
-    parts.forEach((part, pi) => {
-      const used = new Set(ep.scenes.map((s) => s.id));
-      const base = 'E' + (F.ENDING_KEYS.indexOf(shot.beatKey) + 1);
-      const id = pi === 0 && !used.has(base) ? base : freeIds(used, 1, 'E')[0];
-      const sc = mkScene(id, shot.beatKey, part);
-      if (pi === 0 && keepFrame) sc.startImage = keepFrame; // a rebuilt shot keeps its start frame
-      ep.scenes.push(sc);
-      pushLines(ep, id, part.lines);
-    });
-    const beat = (ep.product_ending[shot.beatKey] = ep.product_ending[shot.beatKey] || F.emptyBeat());
-    keepBeatMeta(beat, shot);
-  });
-  orderScenes(ep);
-  F.syncBeats(ep);
-  return { rebuilt: F.ENDING_KEYS.filter((k) => !kept.includes(k)), kept };
-}
-
-/** Creates the empty formula skeleton + the default-template Part B of a NEW episode. */
-function seedFormula(ep, endings, templateId) {
+/** Creates the empty formula skeleton of a NEW episode (six beats, no scenes yet). */
+function seedFormula(ep) {
   ep.comedy_story = {};
-  ep.product_ending = {};
   F.BEAT_KEYS.forEach((k) => { ep.comedy_story[k] = F.emptyBeat(); });
-  F.ENDING_KEYS.forEach((k) => { ep.product_ending[k] = F.emptyBeat(); });
   ep.scenes = [];
   ep.lines = [];
-  ep.ending = { templateId: templateId || endings.activeId(), version: null, vars: {}, manualVars: [] };
-  applyEnding(ep, endings, { respectEdits: false });
   return ep;
 }
 
@@ -124,7 +54,7 @@ function normalizeBeat(raw, key, charIds, maxSceneSec = 15) {
   const scenes = (Array.isArray(raw.scenes) ? raw.scenes : []).map((s) => ({
     title_ko: String(s.title_ko || '').trim(), durationSec: Number(s.durationSec) || 4,
     characters: (Array.isArray(s.characters) ? s.characters : []).map(String).filter((c) => charIds.has(c)),
-    showsProduct: false, // the product never appears in Part A (it enters only through the ending)
+    showsProduct: key === 'product_bridge' && !!s.showsProduct, // the product is shown only in the product-bridge beat
     visual: String(s.visual || ''), action: String(s.action || ''), narration: String(s.narration || ''), placement: '',
     lines: (Array.isArray(s.lines) ? s.lines : []).map((l) => ({ speaker: String(l.speaker || ''), en: String(l.en || '').trim(), ko: String(l.ko || '').trim() })),
   }));
@@ -139,18 +69,12 @@ function normalizeBeat(raw, key, charIds, maxSceneSec = 15) {
   if (problems.length) throw bad(problems[0], problems);
   return { title_ko: String(raw.title_ko).trim(), story_en: String(raw.story_en || '').trim().slice(0, 1500), visual: String(raw.visual || '').trim().slice(0, 1500), scenes };
 }
-function normalizeVars(raw) {
-  if (!raw || typeof raw !== 'object') return {};
-  const out = {};
-  VAR_KEYS.forEach((k) => { const v = String(raw[k] == null ? '' : raw[k]).trim().slice(0, 300); if (v) out[k] = v; });
-  return out;
-}
 function normalizeStory(raw, charIds, maxSceneSec = 15) {
   if (!raw || typeof raw !== 'object' || !raw.comedy_story || typeof raw.comedy_story !== 'object') throw bad('AI 응답에 comedy_story가 없습니다.');
   const beats = {};
   F.BEAT_KEYS.forEach((k) => { beats[k] = normalizeBeat(raw.comedy_story[k], k, charIds, maxSceneSec); });
   const cta = raw.cta && typeof raw.cta === 'object' ? { lines: (raw.cta.lines || []).map(String), keyword: String(raw.cta.keyword || '').trim(), durationSec: Number(raw.cta.durationSec) || 3.5 } : null;
-  return { title: String(raw.title || ''), beats, vars: normalizeVars(raw.ending_vars), cta };
+  return { title: String(raw.title || ''), beats, cta };
 }
 
 function placeBeat(ep, key, data) {
@@ -188,15 +112,15 @@ function replaceBeat(ep, key, data) {
   keepBeatMeta(ep.comedy_story[key], data);
   F.syncBeats(ep);
 }
-/** Replaces the whole of Part A (six beats). Part B is untouched. */
+/** Replaces the whole story (six beats). */
 function replacePartA(ep, beats) {
-  ep.scenes.filter((s) => s.part !== 'B').map((s) => s.id).forEach((id) => dropScene(ep, id));
+  ep.scenes.map((s) => s.id).forEach((id) => dropScene(ep, id));
   F.BEAT_KEYS.forEach((k) => { placeBeat(ep, k, beats[k]); keepBeatMeta(ep.comedy_story[k], beats[k]); });
   orderScenes(ep);
   F.syncBeats(ep);
 }
 // Operator-written beat text does not block the FIRST generation (it is the input); it only counts once the beat already has scenes.
-const partAHasEdits = (ep, keys) => ep.scenes.some((s) => s.part !== 'B' && (!keys || keys.includes(s.beatKey)) && s.manualEdit) || F.BEAT_KEYS.some((k) => (!keys || keys.includes(k)) && (ep.comedy_story[k] || {}).manual && ep.scenes.some((s) => s.beatKey === k));
+const partAHasEdits = (ep, keys) => ep.scenes.some((s) => (!keys || keys.includes(s.beatKey)) && s.manualEdit) || F.BEAT_KEYS.some((k) => (!keys || keys.includes(k)) && (ep.comedy_story[k] || {}).manual && ep.scenes.some((s) => s.beatKey === k));
 
 // ---------- manual-edit tracking + structure lock (used by saveScript) ----------
 function markEdits(prev, ep) {
@@ -215,7 +139,7 @@ function markEdits(prev, ep) {
   });
 }
 function markBeatEdits(prev, ep, patch) {
-  [['comedy_story', F.BEAT_KEYS], ['product_ending', F.ENDING_KEYS]].forEach(([g, keys]) => {
+  [['comedy_story', F.BEAT_KEYS]].forEach(([g, keys]) => {
     if (!patch[g]) return;
     keys.forEach((k) => {
       const inc = patch[g][k];
@@ -225,15 +149,4 @@ function markBeatEdits(prev, ep, patch) {
     });
   });
 }
-function enforceLock(prev, nextScenes) {
-  if (!prev.ending || !prev.ending.structureLocked) return;
-  const a = (prev.scenes || []).filter((s) => s.part === 'B');
-  const b = nextScenes.filter((s) => s.part === 'B');
-  const fail = (m) => { throw new StudioError('STRUCTURE_LOCKED', m, { recovery: '설정 → 엔딩 템플릿에서 "구조 잠금"을 풀거나, 제품별 내용(대사·연출)만 수정하세요.', status: 409 }); };
-  if (a.length !== b.length || a.some((s, i) => s.id !== b[i].id || s.beatKey !== b[i].beatKey)) fail('PART B(제품 엔딩) 구조는 잠겨 있어 컷을 추가·삭제·순서 변경할 수 없습니다.');
-  const lastA = nextScenes.map((s) => s.part).lastIndexOf('A');
-  const firstB = nextScenes.findIndex((s) => s.part === 'B');
-  if (firstB >= 0 && lastA > firstB) fail('PART A 장면은 PART B(제품 엔딩)보다 앞에 있어야 합니다.');
-}
-
-module.exports = { endingVars, applyEnding, seedFormula, normalizeBeat, normalizeStory, normalizeVars, replaceBeat, replacePartA, partAHasEdits, markEdits, markBeatEdits, enforceLock, orderScenes, freeIds };
+module.exports = { seedFormula, normalizeBeat, normalizeStory, replaceBeat, replacePartA, partAHasEdits, markEdits, markBeatEdits, orderScenes, freeIds };

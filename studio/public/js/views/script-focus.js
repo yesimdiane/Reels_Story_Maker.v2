@@ -147,11 +147,11 @@ function deleteSceneButton(ep, d, sid, idxOf) {
 }
 
 /** Approved scene folded into one compact row: number, duration, title, status, short preview. Approval data is untouched; 펼치기 shows the full editor again. */
-function compactScene(ep, d, sid, sc, ap, ctx, draggable, lockedB) {
+function compactScene(ep, d, sid, sc, ap, ctx, draggable) {
   const idx = ep.scenes.findIndex((x) => x.id === sid);
   const first = (d.lines.find((l) => l.sceneId === sid) || {});
   const handle = draggable ? dragHandle(sid) : null;
-  const el = h('div', Object.assign({ class: 'card scene-card scene-compact', id: 'script-scene-' + sid, 'data-scene-card': sid, 'data-collapsed': '' }, lockedB ? { 'data-scene-locked': '' } : {}),
+  const el = h('div', Object.assign({ class: 'card scene-card scene-compact', id: 'script-scene-' + sid, 'data-scene-card': sid, 'data-collapsed': '' }),
     h('div', { class: 'scene-head' },
       h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap;min-width:0' }, handle, h('span', { class: 'scene-no eyebrow' }, `씬 ${idx + 1}`), h('span', { class: 'small muted' }, sid), chip(`${sc.durationSec}초`, ''), ap && ap.approved ? chip(`승인됨 r${ap.revision}`, 'done') : statusChip(ap)),
       h('button', { class: 'btn sm ghost', type: 'button', 'data-scene-expand': sid, 'aria-expanded': 'false', onclick: () => { setCollapsed(ep.id, sid, false); hooks.rerender(); } }, '펼치기')),
@@ -172,10 +172,9 @@ export function sceneFocus(ep, d, ctx, sceneId, { inline = false } = {}) {
   const { index, chars } = ctx;
   const ap = srv.approval;
   const idxOf = ep.scenes.findIndex((x) => x.id === sid);
-  const lockedB = ep.formula.structured && sc.part === 'B' && ep.formula.ending.structureLocked;
   // plain-language change request for "씬 다시 생성하기" (optional): e.g. make Diane's reaction more playful. Not part of the scene data, so it is never saved with it.
   const noteIn = h('input', { type: 'text', maxlength: 1000, 'data-scene-note': sid, 'aria-label': '이 씬 변경 요청 (선택)', placeholder: '고치고 싶은 내용 (선택) — 예: 다이앤의 표정을 더 장난스럽게', style: 'flex:1;min-width:220px' });
-  if (collapsedNow(ep.id, sid) && !d.dirtyScenes.has(sid) && !(ep.sceneRegen || {})[sid]) return compactScene(ep, d, sid, sc, ap, ctx, canMove(ep, sid), lockedB);
+  if (collapsedNow(ep.id, sid) && !d.dirtyScenes.has(sid) && !(ep.sceneRegen || {})[sid]) return compactScene(ep, d, sid, sc, ap, ctx, canMove(ep, sid));
   const errCount = (fields) => (index.errors || []).filter((e) => (e.sceneId === sid || (e.lineId && d.lines.some((l) => l.id === e.lineId && l.sceneId === sid))) && fields.includes(SECTION_OF[e.field] || '')).length;
 
   // ---- action bar (씬 저장 / 씬 승인): the sticky bar and the inline (desktop) buttons share their handlers and state ----
@@ -276,7 +275,7 @@ export function sceneFocus(ep, d, ctx, sceneId, { inline = false } = {}) {
     h('div', { class: 'eyebrow' }, '캐릭터 포즈'), poseFields(sc, dirty),
     field('시각 연출 (필수, English)', 'visual', 5), field('제품 배치 (선택)', 'placement', 2),
     h('label', { class: 'row small', style: 'gap:6px' }, h('input', { type: 'checkbox', 'data-rf': `S:${sid}:showsProduct`, checked: !!sc.showsProduct, onchange: (e) => { sc.showsProduct = e.target.checked; dirty(); } }), '이 장면에 제품이 보임'),
-    lockedB ? null : h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap;align-items:center' },
+    h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap;align-items:center' },
       noteIn,
       h('button', { class: 'btn sm clay', type: 'button', 'data-scene-regenerate': sid, title: '위 시각 연출(과 변경 요청)을 기준으로 이 씬 하나만 다시 만듭니다 (유료 텍스트 호출 · 비용 확인 후 · 검토 전에는 적용되지 않음)', onclick: async (ev) => {
         const busy = busyButton(ev.currentTarget);
@@ -295,7 +294,7 @@ export function sceneFocus(ep, d, ctx, sceneId, { inline = false } = {}) {
   const advanced = section(ep, sid, 'advanced', '③ 고급 설정', { errors: errCount(['advanced']) },
     h('div', { class: 'row', style: 'gap:12px;flex-wrap:wrap' },
       h('label', { class: 'row small muted', style: 'gap:6px' }, '장면 길이', attach(index, h('input', { type: 'number', min: 1, max: 15, step: 0.5, style: 'width:84px', value: sc.durationSec, oninput: (e) => { sc.durationSec = Number(e.target.value); refreshMeter(); dirty(); } }), `S:${sid}:durationSec`), '초'),
-      chip(sc.part ? `PART ${sc.part} · ${sc.beatKey}` : `비트 ${sc.beat || ''}`, ''), lockedB ? chip('🔒 고정 엔딩', 'done') : null),
+      chip(sc.beatKey ? sc.beatKey : `비트 ${sc.beat || ''}`, '')),
     h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' },
       h('button', { class: 'btn sm ghost', type: 'button', 'data-add-cut': sid, title: '이 장면의 영상을 잘라 클로즈업·리액션 컷을 넣습니다 (요금 없음)', onclick: () => { if (isDirty(d)) return toast('저장하지 않은 변경이 있습니다. 먼저 씬을 저장한 뒤 컷을 편집하세요.', { error: true }); openCutEditor(ep, sid); } }, icon('plus'), '컷 추가'),
       cutInfo.inserts.map((i) => h('button', { class: 'chip ' + (i.resolution && i.resolution.level === 'blur' ? 'err' : ''), type: 'button', onclick: () => { if (isDirty(d)) return toast('먼저 씬을 저장하세요.', { error: true }); openCutEditor(ep, sid); } }, `✂ ${i.id} ${i.label} ${i.startSec}–${Math.round((i.startSec + i.durationSec) * 10) / 10}초`))),
@@ -317,12 +316,12 @@ export function sceneFocus(ep, d, ctx, sceneId, { inline = false } = {}) {
   const fillChips = () => chipRow.replaceChildren(...[chip(`${sc.durationSec}초`, ''), ...(sc.characters || []).map((c) => chip((chars.find((x) => x.id === c) || { name: c }).name, '')), sc.showsProduct ? chip('제품 노출', 'attention') : null,
     ap && ap.approved ? chip(`승인됨 r${ap.revision}`, 'done') : ap && ap.editedAfterApproval ? chip('승인 후 수정됨', 'attention') : null].filter(Boolean)); // replaceChildren(null) would print "null"
   fillChips();
-  const el = h('div', Object.assign({ class: 'card scene-card', id: 'script-scene-' + sid, 'data-rf': `S:${sid}:block`, 'data-scene-card': sid }, lockedB ? { 'data-scene-locked': '' } : {}),
+  const el = h('div', Object.assign({ class: 'card scene-card', id: 'script-scene-' + sid, 'data-rf': `S:${sid}:block`, 'data-scene-card': sid }),
     h('div', { class: 'scene-head' },
       h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap;min-width:0' }, canMove(ep, sid) ? dragHandle(sid) : null, h('span', { class: 'scene-no eyebrow' }, `씬 ${idxOf + 1}`), h('span', { class: 'small muted' }, sid), statusChip(ap),
         null),
-      h('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, h('button', { class: 'btn sm ghost', type: 'button', 'data-scene-collapse': sid, 'aria-expanded': 'true', title: '이 씬을 한 줄로 접습니다 (저장 안 된 변경이 있으면 접히지 않습니다)', onclick: () => { if (d.dirtyScenes.has(sid)) return toast('저장하지 않은 변경이 있습니다. 먼저 씬 저장 후 접으세요.', { error: true }); setCollapsed(ep.id, sid, true); hooks.rerender(); } }, '∧ 접기'), sc.part !== 'B' ? h('button', { class: 'btn sm ghost', type: 'button', 'data-dup-scene': sid, title: '이 씬을 그대로 복사해 바로 뒤에 미승인 상태로 만듭니다', onclick: () => ctx.duplicateScene(sid) }, '⎘ 씬 복제') : null,
-      h('button', { class: 'btn sm clay', type: 'button', 'data-add-scene': sid, title: '현재 씬 바로 뒤에 새 씬을 만듭니다 (기존 씬은 바뀌지 않습니다)', onclick: () => ctx.addScene(sid) }, icon('plus'), '씬 추가'), lockedB ? null : deleteSceneButton(ep, d, sid, idxOf))),
+      h('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' }, h('button', { class: 'btn sm ghost', type: 'button', 'data-scene-collapse': sid, 'aria-expanded': 'true', title: '이 씬을 한 줄로 접습니다 (저장 안 된 변경이 있으면 접히지 않습니다)', onclick: () => { if (d.dirtyScenes.has(sid)) return toast('저장하지 않은 변경이 있습니다. 먼저 씬 저장 후 접으세요.', { error: true }); setCollapsed(ep.id, sid, true); hooks.rerender(); } }, '∧ 접기'), h('button', { class: 'btn sm ghost', type: 'button', 'data-dup-scene': sid, title: '이 씬을 그대로 복사해 바로 뒤에 미승인 상태로 만듭니다', onclick: () => ctx.duplicateScene(sid) }, '⎘ 씬 복제'),
+      h('button', { class: 'btn sm clay', type: 'button', 'data-add-scene': sid, title: '현재 씬 바로 뒤에 새 씬을 만듭니다 (기존 씬은 바뀌지 않습니다)', onclick: () => ctx.addScene(sid) }, icon('plus'), '씬 추가'), deleteSceneButton(ep, d, sid, idxOf))),
     attach(index, h('div', { class: 'field', style: 'margin:0' }, h('input', { type: 'text', class: 'scene-title', value: sc.title_ko, placeholder: sc.legacyTitle ? '한국어 제목 입력 (현재: ' + sc.legacyTitle + ')' : '한국어 장면 제목 (예: 영국인의 자신감)', maxLength: 24, 'aria-label': '장면 제목 (한국어)', oninput: (e) => { sc.title_ko = e.target.value; dirty(); } })), `S:${sid}:title_ko`),
     h('div', { class: 'scene-summary' }, h('div', { class: 'scene-summary-text' }, desc, dlgSummary,
       chipRow)),

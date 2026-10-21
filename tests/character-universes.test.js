@@ -125,7 +125,7 @@ test('Story Lab: the selection is remembered per product and sent with every req
   assert.match(ai.calls[2].prompt, /"BABYYYY!!!!!!"/); assert.match(ai.calls[2].prompt, /never says "오빠"/);
 });
 
-test('episodes: the cast and universe travel with the episode; the universe\'s own three-shot ending is used; scripts may only use the cast', async () => {
+test('episodes: the cast and universe travel with the episode; there is no fixed ending; scripts may only use the cast', async () => {
   const ai = textAi();
   const { s } = make({ ai });
   const pid = await readyProduct(s);
@@ -138,13 +138,10 @@ test('episodes: the cast and universe travel with the episode; the universe\'s o
   const ep = s.store.episodes.get(epId);
   assert.equal(ep.universeId, 'gregory-cats'); assert.deepEqual(ep.cast.characterIds, ['cloud', 'louie', 'lucy']); assert.deepEqual(ep.characters, ['cloud', 'louie', 'lucy']);
   assert.equal(ep.series, 'Gregory Cats');
-  assert.equal(ep.ending.templateId, 'gregory-cats-ending-v1', 'same three-shot closing format, designed for this cast');
-  const shots = ep.scenes.filter((x) => x.part === 'B');
-  assert.equal(shots.length, 4, 'three closing steps in the fixed order; the 10 s reaction is two 5 s scenes');
-  assert.deepEqual(shots.map((x) => x.beatKey), ['shopping_excuse', 'product_demonstration', 'jack_reaction', 'jack_reaction']);
-  assert.deepEqual(shots.map((x) => x.characters), [['lucy'], ['louie'], ['lucy', 'cloud'], ['lucy', 'cloud']]);
-  assert.ok(shots.every((x) => !x.characters.includes('jack') && !x.characters.includes('diane')));
-  assert.equal(ep.lines.filter((l) => /BABY/.test(l.en)).length, 0, 'no Jack & Diane lines in the cat ending');
+  assert.equal(ep.ending, undefined, 'no fixed ending');
+  assert.equal(ep.product_ending, undefined);
+  assert.equal(ep.scenes.filter((x) => x.part === 'B').length, 0, 'no Part B scenes');
+  assert.equal(ep.lines.filter((l) => /BABY/.test(l.en)).length, 0, 'no Jack & Diane lines in a cat episode');
   // the script prompt is character-neutral and lists only the cast ids
   const concept = s.storylab.peek(pid, cid);
   const q = s.scriptgen.buildPrompt(ep, concept, '', undefined, 'story');
@@ -153,13 +150,13 @@ test('episodes: the cast and universe travel with the episode; the universe\'s o
   const own = q.prompt.split('\n').filter((l) => !/^(APPROVED_STORYLINE|CONCEPT_|CURRENT_ENDING_VARS)/.test(l)).join('\n'); // fixture story text is test data
   assert.doesNotMatch(own, /Diane|Jack|jack|diane|다이앤|잭/, 'nothing Jack & Diane specific leaks into another universe\'s script prompt');
   // validation: a scene or line outside the cast is an error
-  const bad = JSON.parse(JSON.stringify(ep)); bad.scenes[0].characters = ['jack']; bad.lines.push({ id: 'LX', sceneId: bad.scenes[0].id, speaker: 'diane', en: 'hi', ko: '안녕' });
+  const bad = JSON.parse(JSON.stringify(ep)); bad.scenes = [{ id: 'S1', part: 'A', beatKey: 'setup', title_ko: '도입 장면', durationSec: 4, characters: ['cloud'] }]; bad.scenes[0].characters = ['jack']; bad.lines.push({ id: 'LX', sceneId: bad.scenes[0].id, speaker: 'diane', en: 'hi', ko: '안녕' });
   const { validateScript } = require('../studio/lib/episode');
   const v = validateScript(bad, s.store.characters.load());
   assert.ok(v.errors.filter((e) => e.code === 'OUT_OF_CAST').length >= 2);
 });
 
-test('a fixed ending that needs characters nobody selected requires explicit approval (no silent extra characters)', async () => {
+test('a smaller cast needs no approval and never gains silent extra characters (the old fixed ending cast check is gone)', async () => {
   const ai = textAi();
   const { s } = make({ ai });
   const pid = await readyProduct(s);
@@ -168,11 +165,10 @@ test('a fixed ending that needs characters nobody selected requires explicit app
   const lab = await s.storylab.generate(pid, { category: 'drama', count: 1, confirm: CONFIRM });
   const cid = lab.concepts[0].id;
   await s.storylab.approve(pid, cid);
-  await assert.rejects(s.createEpisodeFromConcept({ productId: pid, conceptId: cid, id: 'EPX1' }), (e) => e.code === 'ENDING_CAST_MISMATCH' && /lucy/.test(e.message) && /louie/.test(e.message));
-  assert.equal(s.store.episodes.list({ all: true }).some((e) => e.id === 'EPX1'), false, 'nothing was created');
-  const id = await s.createEpisodeFromConcept({ productId: pid, conceptId: cid, id: 'EPX2', approveEndingCast: true });
+  const id = await s.createEpisodeFromConcept({ productId: pid, conceptId: cid, id: 'EPX1' });
   const ep = s.store.episodes.get(id);
-  assert.deepEqual(ep.cast.approvedExtras.sort(), ['louie', 'lucy']); assert.deepEqual(ep.cast.characterIds, ['cloud']);
+  assert.deepEqual(ep.cast.approvedExtras, []); assert.deepEqual(ep.cast.characterIds, ['cloud']); assert.deepEqual(ep.characters, ['cloud']);
+  assert.equal(ep.ending, undefined);
 });
 
 test('older concepts/episodes without a cast keep working as the Jack & Diane series', async () => {
@@ -187,7 +183,7 @@ test('older concepts/episodes without a cast keep working as the Jack & Diane se
   await s.storylab.approve(pid, cid);
   const epId = await s.createEpisodeFromConcept({ productId: pid, conceptId: cid, id: 'EPOLD' });
   const ep = s.store.episodes.get(epId);
-  assert.deepEqual(ep.characters, ['jack', 'diane']); assert.equal(ep.series, 'Jack & Diane'); assert.equal(ep.ending.templateId, 'jack-diane-coupang-ending-v1');
+  assert.deepEqual(ep.characters, ['jack', 'diane']); assert.equal(ep.series, 'Jack & Diane'); assert.equal(ep.ending, undefined);
   const q = s.scriptgen.buildPrompt(ep, s.storylab.peek(pid, cid), '', undefined, 'story');
   assert.match(q.prompt, /married couple/); assert.match(q.prompt, /"jack"\|"diane"/);
 });

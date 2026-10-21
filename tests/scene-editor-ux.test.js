@@ -49,16 +49,16 @@ test('approving a scene keeps its approval; collapsing is presentation only, fai
 });
 
 // ---------------------------------------------------------------- 2. reordering
-test('reorder planning: stable IDs, Part B is locked, beats never end up empty, a moved scene stays in its beat while it is next to it', async () => {
+test('reorder planning: stable IDs, every scene is movable (no locked ending), beats never end up empty, a moved scene stays in its beat while it is next to it', async () => {
   const { planReorder, planStep, dropIndex, canMove } = await core();
   const sc = (id, part, beatKey) => ({ id, part, beatKey });
-  const F = { formula: { structured: true }, scenes: [sc('S1', 'A', 'setup'), sc('S2', 'A', 'problem'), sc('S3', 'A', 'problem'), sc('S4', 'A', 'absurd_escalation'), sc('S5', 'A', 'unexpected_twist'), sc('S6', 'A', 'resolution'), sc('S7', 'A', 'product_bridge'), sc('B1', 'B', 'shopping_excuse'), sc('B2', 'B', 'product_demonstration')] };
+  const F = { formula: { structured: true }, scenes: [sc('S1', 'A', 'setup'), sc('S2', 'A', 'problem'), sc('S3', 'A', 'problem'), sc('S4', 'A', 'absurd_escalation'), sc('S5', 'A', 'unexpected_twist'), sc('S6', 'A', 'resolution'), sc('S7', 'A', 'product_bridge')] };
   const up = planStep(F, 'S3', -1);
   assert.deepEqual(up.body.beats.problem, ['S3', 'S2']); assert.equal(up.beatChanged, false);
   assert.deepEqual(up.order, ['S1', 'S3', 'S2', 'S4', 'S5', 'S6', 'S7']);
   assert.equal(planStep(F, 'S1', 1).error.code, 'BEAT_EMPTY', 'a beat\'s only scene cannot leave it');
-  assert.equal(planStep(F, 'B1', -1).error.code, 'LOCKED'); assert.equal(planReorder(F, 'B2', 0).error.code, 'LOCKED');
-  assert.equal(canMove(F, 'B1'), false); assert.equal(canMove(F, 'S2'), true);
+  assert.equal(planStep(F, 'NOPE', -1).error.code, 'LOCKED', 'an unknown scene id cannot be moved'); assert.equal(planReorder(F, 'NOPE', 0).error.code, 'LOCKED');
+  assert.equal(canMove(F, 'NOPE'), false); assert.equal(canMove(F, 'S2'), true); assert.equal(canMove(F, 'S7'), true, 'the last scene (product_bridge) is movable like any other');
   assert.equal(planReorder(F, 'S2', 1).noop, true, 'dropping a scene where it already is changes nothing'); assert.deepEqual(planReorder(F, 'S2', 2).body.beats.problem, ['S3', 'S2']);
   const across = planReorder(F, 'S3', 3); // after S4 → joins the beat it moved towards
   assert.equal(across.beat, 'absurd_escalation'); assert.equal(across.beatChanged, true);
@@ -98,13 +98,14 @@ test('reordering saves the new order, keeps every scene\'s content, lines, chara
   void planReorder;
 });
 
-test('the fixed ending cannot be reordered and a stale or invalid order is rejected without changing anything', async () => {
+test('a stale or invalid order is rejected without changing anything', async () => {
   const m = await setup();
   const e = view(m);
-  const b = e.scenes.filter((s) => s.part === 'B').map((s) => s.id);
+  assert.ok(!e.scenes.some((s) => s.part === 'B'), 'no fixed-ending scenes exist');
+  const ghost = 'E1'; // an old ending scene id that is not part of the episode
   const beats = Object.fromEntries(e.formula.partA.map((x) => [x.key, x.sceneIds.slice()]));
   const keep = ep(m).scenes.map((s) => s.id);
-  await assert.rejects(m.s.reorderScenes(m.id, { beats: Object.assign({}, beats, { setup: beats.setup.concat([b[0]]) }) }), (x) => x.code === 'BAD_ORDER');
+  await assert.rejects(m.s.reorderScenes(m.id, { beats: Object.assign({}, beats, { setup: beats.setup.concat([ghost]) }) }), (x) => x.code === 'BAD_ORDER');
   await assert.rejects(m.s.reorderScenes(m.id, { beats: Object.assign({}, beats, { setup: [] }) }), (x) => x.code === 'BAD_ORDER' || x.code === 'BEAT_EMPTY');
   assert.deepEqual(ep(m).scenes.map((s) => s.id), keep);
 });
@@ -170,7 +171,7 @@ test('cancelling discards the proposal; the original scene (and its approval) is
   assert.deepEqual(snap(m), edited, 'the newer edits were not overwritten');
 });
 
-test('bad AI answers are rejected with nothing stored; one regeneration at a time per scene; the locked ending cannot be regenerated; a missing instruction is refused', async () => {
+test('bad AI answers are rejected with nothing stored; one regeneration at a time per scene; any scene of the story can be regenerated (no locked ending); a missing instruction is refused', async () => {
   const bad = await setup({ regen: (req) => { const r = regenAnswer(req); r.scene.lines = [{ speaker: 'ghost', en: 'one two three four five six seven eight nine ten eleven', ko: '긴 대사' }]; return r; } });
   const sid = ep(bad).scenes.find((s) => s.part === 'A').id;
   const before = snap(bad);
@@ -180,8 +181,7 @@ test('bad AI answers are rejected with nothing stored; one regeneration at a tim
   const id2 = ep(m).scenes.find((s) => s.part === 'A').id;
   const [r1, r2] = await Promise.allSettled([m.s.sceneRegen.regenerate(m.id, id2, { visual: 'First concurrent visual direction, long enough.', confirm: CONFIRM }), m.s.sceneRegen.regenerate(m.id, id2, { visual: 'Second concurrent visual direction, long enough.', confirm: CONFIRM })]);
   assert.equal([r1, r2].filter((r) => r.status === 'fulfilled').length, 1); assert.ok([r1, r2].some((r) => r.status === 'rejected' && r.reason.code === 'REGEN_RUNNING'));
-  const b1 = ep(m).scenes.find((s) => s.part === 'B');
-  await assert.rejects(m.s.sceneRegen.regenerate(m.id, b1.id, { visual: 'A long enough visual direction for the ending.', confirm: CONFIRM }), (e) => e.code === 'ENDING_LOCKED');
+  assert.ok(!ep(m).scenes.some((s) => s.part === 'B'), 'no fixed-ending scenes exist, so nothing is locked');
   await assert.rejects(m.s.sceneRegen.regenerate(m.id, id2, { visual: 'short', confirm: CONFIRM }), (e) => e.code === 'NO_INSTRUCTION');
 });
 

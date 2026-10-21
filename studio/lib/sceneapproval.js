@@ -59,8 +59,8 @@ function validateScene(ep, lib, sid, whole) {
   if (!String(s.visual || '').trim()) E('SCENE_VISUAL', `${sid}: 시각 연출이 비어 있습니다. 이미지 제작에 쓰이므로 꼭 필요합니다.`, 'visual');
   if (!sceneTitle(s)) { if (!errors.some((e) => e.field === 'title_ko')) E('SCENE_TITLE', `${sid}: 한국어 장면 제목이 없습니다.`, 'title_ko'); }
   if (!(s.characters || []).length) warnings.push({ code: 'SCENE_CAST', message: `${sid}: 등장 캐릭터가 선택되지 않았습니다.`, sceneId: sid, field: 'characters' });
-  // Animation is planned second by second: "0.0–1.2 s: ..." segments covering the scene (advice, never blocking; the fixed ending is template text).
-  if (s.part !== 'B' && String(s.visual || '').trim()) {
+  // Animation is planned second by second: "0.0–1.2 s: ..." segments covering the scene (advice, never blocking).
+  if (String(s.visual || '').trim()) {
     const tl = timeline(s.visual);
     if (!tl.segments) warnings.push({ code: 'SCENE_NO_TIMELINE', message: `${sid}: 애니메이션을 초 단위로 계획해 주세요 (예: "0.0–1.2 s: …  1.2–2.5 s: …"). 영상 모델이 장면 길이 안에서 정확히 움직일 수 있습니다.`, sceneId: sid, field: 'visual' });
     else if (Math.abs(tl.end - Number(s.durationSec)) > 0.6) warnings.push({ code: 'SCENE_TIMELINE_LENGTH', message: `${sid}: 애니메이션 타임라인이 ${tl.end}초에서 끝나는데 장면은 ${s.durationSec}초입니다.`, sceneId: sid, field: 'visual' });
@@ -112,7 +112,7 @@ function sceneState(ep, lib, sid, whole) {
 }
 
 /** Project-level readiness: every scene approved + project validation + (formula) six beats, three-shot ending and a valid ending template. */
-function projectReadiness(ep, lib, { endingValid = true, endingNote = '' } = {}) {
+function projectReadiness(ep, lib) {
   const whole = validateScript(ep, lib);
   const scenes = (ep.scenes || []).map((s) => sceneState(ep, lib, s.id, whole));
   const approvedCount = scenes.filter((s) => s.approved).length;
@@ -124,7 +124,6 @@ function projectReadiness(ep, lib, { endingValid = true, endingNote = '' } = {})
   if (!(ep.scenes || []).length) blockers.push({ code: 'NO_SCENES', message: '장면이 없습니다.', scope: 'project' });
   const pending = scenes.filter((s) => !s.approved);
   if (pending.length) blockers.push({ code: 'SCENES_PENDING', message: `아직 승인되지 않은 장면 ${pending.length}개: ${pending.map((s) => s.sceneId).join(', ')}`, scope: 'scenes', sceneIds: pending.map((s) => s.sceneId) });
-  if (F.isStructured(ep) && !endingValid) blockers.push({ code: 'ENDING_TEMPLATE_INVALID', message: endingNote || '선택한 엔딩 템플릿을 사용할 수 없습니다.', scope: 'project' });
   return {
     sceneCount: scenes.length, approvedCount, progress: `${approvedCount}/${scenes.length} 씬 승인`,
     scenes, blockers, validationOk: whole.ok,

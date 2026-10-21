@@ -13,7 +13,7 @@ export function announce(text) {
 
 /**
  * handle: the grip button; card: the scene card; ctx.moveScene(sid, ±1) / ctx.dropScene(sid, index).
- * Cards of the same list carry data-scene-card; locked cards (fixed ending) carry data-scene-locked and are not drop targets.
+ * Cards of the same list carry data-scene-card; cards carrying data-scene-locked are not drop targets.
  */
 export function attachSceneDrag(handle, card, sid, ctx) {
   handle.addEventListener('keydown', (e) => {

@@ -33,7 +33,7 @@ test('title_ko: every generated scene needs a meaningful Korean title; bad or ge
   const { s, id } = await episode(ai());
   await s.scriptgen.generate(id, { confirm: CONFIRM });
   const v = s.episodeView(id);
-  assert.deepEqual(v.scenes.map((x) => x.title_ko), ['영국인의 자신감', '괴물 장마 개시', '서울이 잠긴 날', '출근길의 보트', '물에 빠진 생쥐', '현관 출입 금지', '쇼핑 본능 발동', '신문물 자랑', '영국인의 마지막 고집', '영국인의 마지막 고집']);
+  assert.deepEqual(v.scenes.map((x) => x.title_ko), ['영국인의 자신감', '괴물 장마 개시', '서울이 잠긴 날', '출근길의 보트', '물에 빠진 생쥐', '현관 출입 금지']);
   assert.ok(v.scenes.every((x) => x.title === x.title_ko), 'legacy title mirrors title_ko');
   assert.equal(v.derived.validation.ok, true, JSON.stringify(v.derived.validation.errors));
   assert.equal(s.store.episodes.get(id).scriptSource.titleKo, true);

@@ -133,11 +133,11 @@ test('prompt: the realistic-timing rules and word budgets are in every generatio
   assert.match(presets.LOCKED, /DIALOGUE TIMING/, 'legacy flat prompt too');
   // the prompt actually sent to the model carries it
   assert.match(a.calls.filter((c) => /CONCEPT_TITLE/.test(c.prompt || '')).pop().prompt, /Total English words that FIT a scene/);
-  // the ending variables are asked to stay short so the fixed shots still fit
-  const ending = s.scriptgen.effectivePrompt(id, {}, '', 'ending');
-  assert.match(ending.parts.data, /ENDING_TIMING: keep PRODUCT_NAME and USE_PHRASE to at most 3 words each, and DEMO_LINE_EN to at most 8 words/);
-  // the fixed ending of the default template fits its shots (estimate)
-  const t = s.episodeView(id).derived.timing.scenes.filter((x) => x.sceneId.startsWith('E'));
+  // there is no separate ending any more: no ending mode, no ending timing rule, and every scene (the six beats are the whole episode) is estimated
+  assert.throws(() => s.scriptgen.effectivePrompt(id, {}, '', 'ending'), (e) => e.code === 'BAD_ACTION');
+  assert.doesNotMatch(story, /ENDING_TIMING|ending_vars/);
+  const t = s.episodeView(id).derived.timing.scenes;
+  assert.ok(t.length > 0 && t.every((x) => !x.sceneId.startsWith('E')), 'no E-shots');
   assert.ok(t.every((x) => x.status === 'ok'), JSON.stringify(t));
 });
 
@@ -145,12 +145,12 @@ test('prompt: the realistic-timing rules and word budgets are in every generatio
 // a story whose model wrote too much dialogue in two scenes (S1 setup, S5 resolution)
 const overlong = () => { const g = umbrellaStory(); g.comedy_story.setup.scenes[0].lines = [{ speaker: 'jack', en: LONG, ko: '정말로 비는 남한테나 사소한 불편이지' }]; g.comedy_story.resolution.scenes[0].lines = [{ speaker: 'jack', en: LONG, ko: '정말로 비는 남한테나 사소한 불편이지' }]; return g; };
 
-test('fix action: shortens the overflowing Part A scenes (no scene extension, story beats and the ending untouched), paid + confirmed', async () => {
+test('fix action: shortens the overflowing Part A scenes (no scene extension, story beats untouched), paid + confirmed', async () => {
   const a = ai({ story: overlong });
   const { s, id } = await episode(a);
   const before = s.store.episodes.get(id);
   const beatsBefore = JSON.stringify(before.comedy_story);
-  const endingBefore = snap(before, (x) => x.part === 'B');
+  assert.equal(before.scenes.filter((x) => x.part === 'B').length, 0, 'no ending part exists');
   const durationsBefore = before.scenes.map((x) => x.durationSec);
   const est = s.scriptgen.fitEstimate(id, []);
   assert.deepEqual(est.sceneIds, ['S1', 'S5']);
@@ -164,7 +164,7 @@ test('fix action: shortens the overflowing Part A scenes (no scene extension, st
   const after = s.store.episodes.get(id);
   assert.deepEqual(after.scenes.map((x) => x.durationSec), durationsBefore, 'scene durations are NOT extended');
   assert.equal(JSON.stringify(after.comedy_story), beatsBefore, 'the six beats (titles, stories, scene links) are unchanged');
-  assert.equal(snap(after, (x) => x.part === 'B'), endingBefore, 'the fixed three-shot ending is untouched');
+  assert.equal(after.scenes.filter((x) => x.part === 'B').length, 0, 'still no ending part');
   assert.ok(after.lines.filter((l) => l.sceneId === 'S1').length >= 1);
   assert.equal(s.episodeView(id).derived.validation.ok, true);
   assert.match(a.calls.at(-1).prompt, /TIMING_TARGETS/);
@@ -172,7 +172,7 @@ test('fix action: shortens the overflowing Part A scenes (no scene extension, st
   assert.ok(s.store.episodes.versions(id).some((v) => /대사 시간 맞추기/.test(v.note)), 'recorded as a version');
 });
 
-test('fix action: an approved script or hand edits are never changed without an explicit overwrite; the ending is never shortened by AI', async () => {
+test('fix action: an approved script or hand edits are never changed without an explicit overwrite', async () => {
   const { s, id } = await episode();
   await approveWithScenes(s, id);
   await makeLong(s, id, ['S1']); // editing un-approves; re-fix to approve again below
@@ -186,12 +186,9 @@ test('fix action: an approved script or hand edits are never changed without an 
   await approveWithScenes(second.s, second.id);
   assert.equal(second.s.episodeView(second.id).derived.scriptApproved, true);
   await assert.rejects(second.s.scriptgen.fitDialogue(second.id, { confirm: CONFIRM }), (e) => e.code === 'NOTHING_TO_FIT');
-  // an overflowing ENDING shot is never rewritten by the AI
+  // there is no ending shot to protect any more: an E1 scene id does not exist
   const t = await episode();
-  const ep = t.s.store.episodes.get(t.id);
-  await t.s.saveScript(t.id, { lines: ep.lines.map((l) => ({ ...l, en: l.sceneId === 'E1' ? LONG : l.en })) });
-  assert.equal(t.s.episodeView(t.id).derived.validation.errors.some((e) => e.code === 'SCENE_OVERFLOW' && e.sceneId === 'E1'), true);
-  await assert.rejects(t.s.scriptgen.fitDialogue(t.id, { confirm: CONFIRM, sceneIds: ['E1'] }), (e) => e.code === 'NOTHING_TO_FIT' && /엔딩/.test(e.message));
+  await assert.rejects(t.s.scriptgen.fitDialogue(t.id, { confirm: CONFIRM, sceneIds: ['E1'] }), (e) => e.code === 'NOTHING_TO_FIT');
 });
 
 test('fix action: an AI answer that adds lines, changes a speaker or uses a forbidden claim is rejected and nothing changes', async () => {

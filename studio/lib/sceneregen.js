@@ -32,7 +32,6 @@ function createSceneRegen({ store, storylab, router, universes, lib, charRefs, s
 
   function checkAllowed(ep, sid) {
     const sc = sceneOf(ep, sid);
-    if (F.isStructured(ep) && sc.part === 'B' && ep.ending && ep.ending.structureLocked) throw new StudioError('ENDING_LOCKED', '고정 엔딩 컷은 다시 생성할 수 없습니다 (엔딩 템플릿에서 고칩니다).', { status: 409 });
     return sc;
   }
 

@@ -15,11 +15,10 @@ function mockFormula(prompt) {
     resolution: { title_ko: '물에 빠진 생쥐', story_en: '[sample] Jack makes it home, soaked.', visual: 'Jack reaches the hilltop home.', scenes: [scene('물에 빠진 생쥐', 'Jack reaches the hilltop home.', [['jack', 'I made it.', '해냈어.']])] },
     product_bridge: { title_ko: '현관 출입 금지', story_en: '[sample] Jack drips everywhere; Diane has her excuse.', visual: 'Diane stops Jack at the door with a towel.', scenes: [scene('현관 출입 금지', 'Diane stops Jack at the door with a towel.', [['diane', 'Stop right there! Not one drop inside!', '거기 서! 한 방울도 안 돼!']])] },
   };
-  const vars = { PRODUCT_NAME: product, PRODUCT_NAME_KO: product, USE_PHRASE: 'it', USE_PHRASE_KO: '그걸', DEMO_ACTION: `Diane uses ${product} as intended (sample).`, DEMO_ACTION_KO: `${product} 사용 (샘플)`, DEMO_LINE_EN: 'Look how easy that is!', DEMO_LINE_KO: '봐, 이렇게 쉬워!' };
+  beats.product_bridge.scenes.forEach((x) => { x.showsProduct = true; }); // the product is shown in the product bridge (there is no separate ending)
   const target = /TARGET_BEAT:\s*(\w+)/.exec(prompt);
   if (target && beats[target[1]]) return { beat: beats[target[1]] };
-  if (!/"comedy_story": \{"setup"/.test(prompt)) return { ending_vars: vars };
-  return { title: '[샘플] ' + product, comedy_story: beats, ending_vars: vars, cta: { lines: ["댓글에 '링크' 남기면 링크 드림!"], keyword: '링크', durationSec: 3.5 } };
+  return { title: '[샘플] ' + product, comedy_story: beats, cta: { lines: ["댓글에 '링크' 남기면 링크 드림!"], keyword: '링크', durationSec: 3.5 } };
 }
 
 
@@ -105,7 +104,7 @@ function createMockText() {
       }
       if (task === 'scriptWriting' && /TRANSLATE_TO:/.test(prompt)) { const to = /TRANSLATE_TO:\s*(\w+)/.exec(prompt)[1]; const src = /<<<TEXT\n([\s\S]*?)\nTEXT>>>/.exec(prompt)[1]; return { text: '', json: { translation: (to === 'Korean' ? '[샘플 번역 — AI 미연결] ' : '[Sample translation — AI not connected] ') + src }, usage: { inputTokens: null, outputTokens: null } }; }
       if (task === 'scriptWriting' && /TIMING_TARGETS/.test(prompt)) return { text: '', json: mockTiming(prompt), usage: { inputTokens: null, outputTokens: null } };
-      if (task === 'scriptWriting' && /"comedy_story": \{"setup"|\{"ending_vars"|\{"beat": BEAT/.test(prompt)) return { text: '', json: addSampleKo(mockFormula(prompt)), usage: { inputTokens: null, outputTokens: null } };
+      if (task === 'scriptWriting' && /"comedy_story": \{"setup"|\{"beat": BEAT/.test(prompt)) return { text: '', json: addSampleKo(mockFormula(prompt)), usage: { inputTokens: null, outputTokens: null } };
       if (task === 'scriptWriting') {
         const c = (/CONCEPT_TITLE:\s*(.+)/.exec(prompt) || [, '샘플'])[1].trim();
         return { text: '', json: addSampleKo({ title: c, beats: ['상황 제시', '문제 확대', '제품 발견', '반전'], scenes: [{ id: 'S1', title_ko: '문제에 빠진 남편', title: '문제에 빠진 남편', beat: 1, durationSec: 5, characters: ['jack'], showsProduct: false, visual: 'Jack faces the household problem at the entryway.', action: 'Jack sighs.', narration: '' }, { id: 'S2', title_ko: '아내의 신문물 자랑', title: '아내의 신문물 자랑', beat: 2, durationSec: 5, characters: ['diane', 'jack'], showsProduct: true, visual: 'Diane shows the product to Jack.', action: 'Diane points at the product.', narration: '' }], lines: [{ id: 'L1', sceneId: 'S2', speaker: 'diane', en: 'Look what I found!', ko: '내가 뭘 찾았게!' }], cta: { lines: ['댓글에 ‘링크’ 남기면 링크 드림!'], keyword: '링크', durationSec: 3.5 } }), usage: { inputTokens: null, outputTokens: null } };

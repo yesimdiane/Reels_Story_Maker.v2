@@ -1,6 +1,5 @@
 // "Big picture" of the episode + drag & drop scene order.
 //   PART A: the six story beats as columns; drag a scene chip within a beat or into another beat (every beat keeps at least one scene).
-//   PART B: the fixed three-shot product ending is not draggable; it shows the approved product reference images instead.
 // Moving scenes saves the new order right away (a dedicated, small request); unsaved text edits must be saved first.
 import { h, chip, toast } from '../ui.js';
 import { state, act } from '../state.js';
@@ -53,7 +52,6 @@ export function structureMap(ep, { dirty, addSceneIn, openScene }) {
       const id = e.dataTransfer.getData('text/plain');
       if (!sceneOf(id)) return;
       if (F.structured) {
-        if (sceneOf(id).part === 'B') return toast('고정 엔딩 컷은 옮길 수 없습니다.', { error: true });
         const srcKey = sceneOf(id).beatKey;
         const beats = Object.fromEntries(F.partA.map((b) => [b.key, b.sceneIds.slice()]));
         const idx = indexAt(z, e, id);
@@ -73,13 +71,7 @@ export function structureMap(ep, { dirty, addSceneIn, openScene }) {
   }
 
   if (F.structured) {
-    root.append(h('div', { class: 'eyebrow' }, 'PART A — 이번 에피소드 이야기'));
     root.append(h('div', { class: 'beat-columns' }, F.partA.map((b) => h('div', { class: 'beat-col' }, h('div', { class: 'beat-title' }, h('span', { class: 'beat-title-text' }, h('b', null, b.label), h('span', { class: 'small muted' }, ' ' + b.labelEn)), addSceneIn ? h('button', { class: 'btn-step-add', type: 'button', 'data-beat-add': b.key, title: `${b.label} 단계에 새 씬 추가`, onclick: () => addSceneIn(b.key) }, '+ 추가') : null), zone(b.key, b.sceneIds)))));
-    const imgs = (ep.productRefImages && ep.productRefImages.length ? ep.productRefImages : (ep.productStudioImages || []).filter((i) => i.status === 'approved'));
-    root.append(h('div', { class: 'eyebrow', style: 'margin-top:4px' }, 'PART B — 고정 제품 엔딩 (' + F.partB.map((b) => b.sceneIds.join('·')).join(' / ') + ')'));
-    root.append(h('div', { class: 'row', style: 'gap:10px;flex-wrap:wrap;align-items:center' },
-      imgs.length ? imgs.map((im) => h('img', { class: 'ref-thumb', src: im.url, alt: im.label || '제품 참조 이미지', title: im.label || '' })) : h('span', { class: 'small muted' }, '승인된 제품 참조 이미지가 없습니다. ', h('a', { href: '#/products' }, '제품 스튜디오에서 승인하세요')),
-      chip('드래그 불가 (고정)', 'done')));
   } else {
     root.append(h('div', { class: 'beat-columns single' }, h('div', { class: 'beat-col' }, h('div', { class: 'beat-title' }, h('b', null, '장면 순서')), zone(null, ep.scenes.map((s) => s.id)))));
   }

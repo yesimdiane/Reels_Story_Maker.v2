@@ -85,7 +85,7 @@ test('saving inserts: versioned, free (no AI/video call), scene length and dialo
   assert.equal(sc.approval.approved, false, 'new edits require review');
   assert.equal(sc.approval.editedAfterApproval, true);
   assert.equal(s.projects.sceneHistory(id, 'S1').versions.length, 1, 'the previously approved version is preserved');
-  assert.equal(v.scenes.filter((x) => x.approval.approved).length, 9, 'other scenes are unaffected');
+  assert.equal(v.scenes.filter((x) => x.approval.approved).length, 5, 'other scenes are unaffected');
   assert.ok(s.store.episodes.versions(id).some((x) => /컷 편집 \(S1\)/.test(x.note)), 'versioned');
   assert.equal(v.derived.scriptApproved, false === false ? v.derived.scriptApproved : null);
   // approving the scene again records revision 2 that includes the insert

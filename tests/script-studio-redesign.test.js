@@ -80,34 +80,36 @@ test('a scene cannot be approved while its dialogue does not fit — and scenes 
   }
 });
 
-test('the episode maximum video length is a hard limit: total over the max blocks script approval until scenes are shortened', async () => {
+test('the episode maximum video length is only a guide: going over warns but never blocks script approval', async () => {
   const m = await setup('drama', 60);
-  const ep = m.s.store.episodes.get(m.id);
   const total = m.s.episodeView(m.id).derived.totalPlannedSec;
-  assert.equal(m.s.episodeView(m.id).derived.validation.errors.some((e) => e.code === 'TOTAL_OVER_MAX'), false);
+  const codes = (v) => ({ err: v.errors.some((e) => e.code === 'TOTAL_OVER_MAX'), warn: v.warnings.some((w) => w.code === 'TOTAL_OVER_MAX') });
+  assert.deepEqual(codes(m.s.episodeView(m.id).derived.validation), { err: false, warn: false });
   await m.s.store.episodes.update(m.id, (e) => { e.maxDurationSec = Math.max(10, Math.floor(total) - 5); });
   const v = m.s.episodeView(m.id).derived.validation;
-  const e = v.errors.find((x) => x.code === 'TOTAL_OVER_MAX');
-  assert.ok(e); assert.match(e.message, /최대 영상 길이/);
-  await assert.rejects(approveWithScenes(m.s, m.id), (x) => x.code === 'INVALID_SCRIPT');
+  assert.deepEqual(codes(v), { err: false, warn: true }, 'a warning, not an error');
+  assert.match(v.warnings.find((x) => x.code === 'TOTAL_OVER_MAX').message, /권장 영상 길이/);
+  await approveWithScenes(m.s, m.id); // approval is not blocked
   assert.equal(m.s.episodeView(m.id).derived.totalPlannedSec, total, 'nothing was trimmed automatically');
   await m.s.store.episodes.update(m.id, (x) => { x.maxDurationSec = Math.ceil(total) + 1; });
-  assert.equal(m.s.episodeView(m.id).derived.validation.errors.some((x) => x.code === 'TOTAL_OVER_MAX'), false);
-  void ep;
+  assert.deepEqual(codes(m.s.episodeView(m.id).derived.validation), { err: false, warn: false });
 });
 
-test('every newly created episode category uses the six-beat story and reusable shopping ending', async () => {
+test('every newly created episode category uses the six-beat story and no fixed ending', async () => {
   const d = await setup('drama');
   const dep = d.s.store.episodes.get(d.id);
-  assert.ok(dep.comedy_story && dep.product_ending, 'drama: six-beat story + reusable ending');
+  assert.ok(dep.comedy_story, 'drama: six-beat story');
+  assert.equal(dep.product_ending, undefined, 'drama: no fixed ending');
   for (const category of ['viral', 'info']) {
     const m = await setup(category);
     const ep = m.s.store.episodes.get(m.id);
     assert.ok(ep.comedy_story, category + ': six beats');
-    assert.ok(ep.product_ending, category + ': fixed product ending');
+    assert.equal(ep.product_ending, undefined, category + ': no fixed product ending');
+    assert.equal(ep.ending, undefined, category + ': no ending settings');
     assert.deepEqual(Object.keys(ep.comedy_story).length, 6);
     assert.ok(ep.scenes.length > 0 && ep.lines.length > 0);
-    assert.ok(ep.scenes.some((s) => s.part === 'B'));
+    assert.ok(ep.scenes.every((s) => s.part === 'A'), category + ': no Part B scenes');
+    assert.ok(ep.scenes.some((s) => s.beatKey === 'product_bridge' && s.showsProduct), category + ': the product is shown in the product bridge');
     // and it can go all the way to the hand-off
     await approveWithScenes(m.s, m.id);
     const ho = await m.s.projects.handoff(m.id);

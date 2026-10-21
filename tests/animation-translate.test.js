@@ -70,7 +70,7 @@ test('translating does not touch approvals (the script stays approved)', async (
   await s.approveScript(id);
   await s.translator.translate(id, { text: 'Jack smirks.', confirm: CONFIRM });
   assert.equal(s.episodeView(id).derived.scriptApproved, true);
-  assert.equal(s.episodeView(id).derived.sceneApproval.progress, '10/10 씬 승인');
+  assert.equal(s.episodeView(id).derived.sceneApproval.progress, '6/6 씬 승인');
 });
 
 test('mock AI (not connected) gives a clearly marked sample translation', async () => {

@@ -21,7 +21,7 @@ async function setup() {
   return { m, id };
 }
 
-test('duplicateScene: copy lands right after the source, unapproved, with a cut title; the source and the ending are untouched', async () => {
+test('duplicateScene: copy lands right after the source, unapproved, with a cut title; the source is untouched', async () => {
   const { m, id } = await setup();
   const ep0 = m.s.store.episodes.get(id);
   const src = ep0.scenes.find((x) => x.part === 'A');
@@ -41,11 +41,10 @@ test('duplicateScene: copy lands right after the source, unapproved, with a cut 
   assert.equal(new Set(ep.lines.map((l) => l.id)).size, ep.lines.length, 'unique line ids');
   assert.ok(!(ep.sceneApprovals || {})[copy.id] || !ep.sceneApprovals[copy.id].approved, 'copy is not approved');
   assert.equal(r.scenes.find((x) => x.id === copy.id).sceneApproval ? r.scenes.find((x) => x.id === copy.id).sceneApproval.approved : false, false);
-  // a second copy gets the next cut number; the ending cannot be copied
+  // a second copy gets the next cut number; there is no fixed ending any more (no Part B scenes exist)
   const r2 = await m.s.duplicateScene(id, src.id);
   assert.notEqual(m.s.store.episodes.get(id).scenes.find((x) => x.id === r2.newSceneId).title_ko, copy.title_ko);
-  const b = ep.scenes.find((x) => x.part === 'B');
-  await assert.rejects(() => m.s.duplicateScene(id, b.id), /ENDING_LOCKED|엔딩/);
+  assert.ok(!ep.scenes.some((x) => x.part === 'B' || /^E\d/.test(x.id)), 'no ending scenes exist');
   await assert.rejects(() => m.s.duplicateScene(id, 'S999'), /찾을 수 없/);
 });
 

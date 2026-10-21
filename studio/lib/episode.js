@@ -180,11 +180,11 @@ function validateScript(ep, lib) {
   (cta.lines || []).forEach((l) => claimHits(l, forbiddenClaims).forEach((h) => E('PRODUCT_CLAIM', `CTA: 확인되지 않은 제품 주장 "${h.claim}"가 있습니다 (…${h.context}…).`, { field: 'cta.lines' })));
   if (ep.publishing && ep.publishing.keyword && ep.publishing.keyword !== kw) E('KEYWORD_MISMATCH', 'CTA 키워드와 게시 키워드가 다릅니다.', { field: 'cta.keyword' });
   const total = totalPlannedSec(ep);
-  if (total > 90) E('TOO_LONG', `총 길이 ${total.toFixed(1)}초가 인스타그램 릴스 한도(90초)를 넘습니다.`);
+  if (total > 300) E('TOO_LONG', `총 길이 ${total.toFixed(1)}초가 인스타그램 릴스 한도(5분 = 300초)를 넘습니다.`);
   else if (total > 60) W('LONG', `총 길이 ${total.toFixed(1)}초 — 릴스는 보통 60초 이하가 좋습니다.`);
-  // The episode's maximum video length (set in Story Lab) is a hard limit; scenes are never stretched or trimmed silently.
+  // The episode's maximum video length (set in Story Lab) is a guide, not a gate: going over only warns; scenes are never stretched or trimmed silently.
   const maxSec = Number(ep.maxDurationSec);
-  if (maxSec >= 10 && total > maxSec + 0.001) E('TOTAL_OVER_MAX', `총 길이 ${total.toFixed(1)}초가 이 에피소드의 최대 영상 길이 ${maxSec}초를 넘습니다. 장면 길이를 줄이거나 장면을 줄여 주세요.`, { field: 'durationSec' });
+  if (maxSec >= 10 && total > maxSec + 0.001) W('TOTAL_OVER_MAX', `참고: 총 길이 ${total.toFixed(1)}초가 이 에피소드의 권장 영상 길이 ${maxSec}초를 넘습니다. 필요하면 장면 길이를 줄이거나 장면을 줄여 보세요 (승인과 다음 단계 진행은 막지 않습니다).`, { field: 'durationSec' });
   // Episodes that follow the fixed formula (Part A: six beats, Part B: exactly three product-ending shots) are checked structurally too.
   const formula = require('./formula');
   if (formula.isStructured(ep)) formula.validateFormula(ep).forEach((e) => errors.push(e));
