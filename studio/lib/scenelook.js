@@ -61,6 +61,30 @@ function deriveText(elements) {
   return { action: join(['body']), emotion: join(['emotion', 'face']).slice(0, 200) };
 }
 
+const escRe = (t) => String(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/**
+ * Who is in a scene: the characters the writer listed, plus everyone who speaks in it; when that is still nobody, the characters
+ * the scene text names (an exclusion such as "without Diane" does not count). Only known ids. Never invents anyone.
+ *   names: { characterId: [display names…] }
+ */
+function inferCast({ characters = [], speakers = [], text = '' } = {}, knownIds, names = {}) {
+  const ids = knownIds instanceof Set ? knownIds : new Set(knownIds || []);
+  const out = [];
+  [...(characters || []), ...(speakers || [])].map(String).forEach((c) => { if (ids.has(c) && !out.includes(c)) out.push(c); });
+  if (!out.length && text) {
+    const { isExcludedMention } = require('./charrules');
+    const clauses = String(text).toLowerCase().split(/[.\n;!?]+/).map((x) => x.trim()).filter(Boolean);
+    [...ids].forEach((id) => {
+      const label = Array.from(new Set([id].concat(names[id] || []))).map((n) => String(n || '').toLowerCase()).filter(Boolean);
+      // Latin names need a word boundary; Hangul names are followed by particles (다이앤이, 잭은), so only the left boundary counts
+      const re = (n) => new RegExp(/[가-힣]/.test(n) ? `(^|[^a-z0-9가-힣])${escRe(n)}` : `(^|[^a-z0-9가-힣])${escRe(n)}($|[^a-z0-9가-힣])`);
+      const hit = clauses.some((cl) => label.some((n) => re(n).test(cl) && !isExcludedMention(cl, n)));
+      if (hit && !out.includes(id)) out.push(id);
+    });
+  }
+  return out;
+}
+
 /** English lines for image / video prompts. Reference-only characters are named as NOT to be depicted. */
 function promptLines(scene, lib) {
   const name = (id) => ((lib.characters || []).find((c) => c.id === id) || { name: id }).name;
@@ -87,4 +111,4 @@ function promptLines(scene, lib) {
 /** content for the storyboard approval hash; empty → null so approvals made before these fields existed keep their hash */
 const lookHashPart = (s) => (s.look || s.pose ? { look: s.look || null, pose: s.pose || null } : null);
 
-module.exports = { cleanElements, deriveText, ELEMENT_TYPES, cleanLook, cleanPose, cleanReferenceOnly, promptLines, lookHashPart, LOOK_KEYS, POSE_KEYS };
+module.exports = { inferCast, cleanElements, deriveText, ELEMENT_TYPES, cleanLook, cleanPose, cleanReferenceOnly, promptLines, lookHashPart, LOOK_KEYS, POSE_KEYS };

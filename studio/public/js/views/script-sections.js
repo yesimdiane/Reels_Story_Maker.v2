@@ -35,7 +35,14 @@ export function characterRoles(ep, sc, castList, dirty, onChange) {
       h('b', { style: 'min-width:70px' }, c.name),
       h('select', { 'aria-label': `${c.name} 역할`, 'data-role': c.id, onchange: (e) => apply(c.id, e.target.value) },
         [['visible', '장면에 등장 (보임)'], ['reference', '참조만 (장면에 나오지 않음)'], ['none', '이 장면에 없음']].map(([v, l]) => h('option', { value: v, selected: role(c.id) === v }, l))))),
-    h('div', { class: 'small muted' }, '"참조만"은 외모 연속성을 위한 표시입니다. 이미지·영상 프롬프트에 "그리지 말 것"으로 전달되며 장면에 나오지 않습니다.'));
+    h('div', { class: 'small muted' }, '"참조만"은 외모 연속성을 위한 표시입니다. 이미지·영상 프롬프트에 "그리지 말 것"으로 전달되며 장면에 나오지 않습니다.'),
+    h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap;align-items:center' },
+      h('button', { class: 'btn sm ghost', type: 'button', 'data-cast-infer': sc.id, title: '이 씬의 대사 화자와 설명에 나온 이름으로 출연 캐릭터를 채웁니다', onclick: async () => {
+        const d = state.draft && state.draft.script;
+        if (d && (d.dirty || d.epDirty)) return toast('저장하지 않은 변경이 있습니다. 먼저 저장한 뒤 눌러 주세요.', { error: true });
+        await act(() => api.post(`/api/episodes/${ep.id}/scenes/${sc.id}/cast/infer`), { ok: '대사·설명에 맞춰 출연 캐릭터를 채웠습니다' });
+      } }, '대사·설명으로 출연 자동 채우기'),
+      !(sc.characters || []).length ? h('span', { class: 'small', style: 'color:var(--rose)' }, '출연 캐릭터가 비어 있으면 캐릭터 참조 없이 엉뚱한 인물이 그려집니다.') : null));
 }
 
 export function poseFields(sc, dirty) {

@@ -6,7 +6,7 @@
 /** Sample output for the fixed episode formula (clearly generic; real AI replaces it). */
 function mockFormula(prompt) {
   const product = (/PRODUCT_NAME:\s*(.+)/.exec(prompt) || [, '제품'])[1].trim();
-  const scene = (title, visual, lines) => ({ title_ko: title, durationSec: 4, characters: lines.some((l) => l[0] === 'diane') ? ['diane'] : ['jack'], showsProduct: false, visual, action: '[샘플] ' + visual, narration: '', placement: '', lines: lines.map(([speaker, en, ko]) => ({ speaker, en, ko })) });
+  const scene = (title, visual, lines) => ({ title_ko: title, durationSec: 4, characters: lines.some((l) => l[0] === 'diane') ? ['diane'] : ['jack'], showsProduct: false, look: { background: '[sample] a Seoul street', lighting: '[sample] soft daylight', atmosphere: '[sample] light comic tension' }, visual, action: '[샘플] ' + visual, narration: '', placement: '', lines: lines.map(([speaker, en, ko]) => ({ speaker, en, ko })) });
   const beats = {
     setup: { title_ko: '영국인의 자신감', story_en: '[sample] Jack confidently ignores the obvious preparation.', visual: 'Jack strides down a busy Seoul street.', scenes: [scene('영국인의 자신감', 'Jack strides down a busy Seoul street.', [['jack', 'I do not need that.', '그건 필요 없어.']])] },
     problem: { title_ko: '서울이 잠긴 날', story_en: '[sample] A real problem starts.', visual: 'The problem begins around Jack.', scenes: [scene('서울이 잠긴 날', 'The problem begins around Jack.', [['jack', 'It is fine. Totally fine.', '괜찮아. 완전 괜찮아.']])] },

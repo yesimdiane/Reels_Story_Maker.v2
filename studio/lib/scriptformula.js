@@ -4,6 +4,7 @@
 const { StudioError } = require('./util');
 const { checkTitleKo } = require('./episode');
 const F = require('./formula');
+const sceneLook = require('./scenelook');
 
 const SCENE_FIELDS = ['title_ko', 'visual', 'action', 'narration', 'placement', 'durationSec', 'showsProduct'];
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -21,7 +22,7 @@ function nextLineIds(ep, n) {
 }
 function mkScene(id, key, d) {
   const order = F.ALL_KEYS.indexOf(key) + 1;
-  return { id, part: F.partOf(key), beatKey: key, beat: order, title_ko: d.title_ko, title: d.title_ko, durationSec: d.durationSec, characters: d.characters.slice(), showsProduct: !!d.showsProduct, visual: d.visual || '', action: d.action || '', narration: d.narration || '', placement: d.placement || '', manualEdit: false };
+  return { id, part: F.partOf(key), beatKey: key, beat: order, title_ko: d.title_ko, title: d.title_ko, durationSec: d.durationSec, characters: d.characters.slice(), ...(d.look ? { look: d.look } : {}), showsProduct: !!d.showsProduct, visual: d.visual || '', action: d.action || '', narration: d.narration || '', placement: d.placement || '', manualEdit: false };
 }
 function pushLines(ep, sceneId, lines) {
   const ids = nextLineIds(ep, lines.length);
@@ -46,14 +47,17 @@ function seedFormula(ep) {
 // ---------- AI output ----------
 const bad = (message, details = []) => new StudioError('SCRIPT_REJECTED', message, { details, recovery: '다시 생성하거나 프롬프트를 확인하세요. 저장하지 않았습니다.', status: 422 });
 
-function normalizeBeat(raw, key, charIds, maxSceneSec = 15) {
+function normalizeBeat(raw, key, charIds, maxSceneSec = 15, names = {}) {
   const meta = F.beatMeta(key);
   if (!raw || typeof raw !== 'object') throw bad(`"${meta.ko}" 단계가 없습니다.`);
   const t = checkTitleKo(raw.title_ko);
   if (t.errors.length) throw bad(`"${meta.ko}" 단계 제목: ${t.errors[0]}`, t.errors);
   const scenes = (Array.isArray(raw.scenes) ? raw.scenes : []).map((s) => ({
     title_ko: String(s.title_ko || '').trim(), durationSec: Number(s.durationSec) || 4,
-    characters: (Array.isArray(s.characters) ? s.characters : []).map(String).filter((c) => charIds.has(c)),
+    // who is in the scene: the listed characters + everyone who speaks (+ names found in the scene text when nobody is listed)
+    characters: sceneLook.inferCast({ characters: s.characters, speakers: (Array.isArray(s.lines) ? s.lines : []).map((l) => l && l.speaker), text: [s.visual, s.action].join('. ') }, charIds, names),
+    // environment the image generator needs: place / lighting / mood (English); empty stays empty, never invented here
+    look: sceneLook.cleanLook({ background: s.look && s.look.background, lighting: s.look && s.look.lighting, atmosphere: s.look && s.look.atmosphere }),
     showsProduct: key === 'product_bridge' && !!s.showsProduct, // the product is shown only in the product-bridge beat
     visual: String(s.visual || ''), action: String(s.action || ''), narration: String(s.narration || ''), placement: '',
     lines: (Array.isArray(s.lines) ? s.lines : []).map((l) => ({ speaker: String(l.speaker || ''), en: String(l.en || '').trim(), ko: String(l.ko || '').trim() })),
@@ -69,10 +73,10 @@ function normalizeBeat(raw, key, charIds, maxSceneSec = 15) {
   if (problems.length) throw bad(problems[0], problems);
   return { title_ko: String(raw.title_ko).trim(), story_en: String(raw.story_en || '').trim().slice(0, 1500), visual: String(raw.visual || '').trim().slice(0, 1500), scenes };
 }
-function normalizeStory(raw, charIds, maxSceneSec = 15) {
+function normalizeStory(raw, charIds, maxSceneSec = 15, names = {}) {
   if (!raw || typeof raw !== 'object' || !raw.comedy_story || typeof raw.comedy_story !== 'object') throw bad('AI 응답에 comedy_story가 없습니다.');
   const beats = {};
-  F.BEAT_KEYS.forEach((k) => { beats[k] = normalizeBeat(raw.comedy_story[k], k, charIds, maxSceneSec); });
+  F.BEAT_KEYS.forEach((k) => { beats[k] = normalizeBeat(raw.comedy_story[k], k, charIds, maxSceneSec, names); });
   const cta = raw.cta && typeof raw.cta === 'object' ? { lines: (raw.cta.lines || []).map(String), keyword: String(raw.cta.keyword || '').trim(), durationSec: Number(raw.cta.durationSec) || 3.5 } : null;
   return { title: String(raw.title || ''), beats, cta };
 }

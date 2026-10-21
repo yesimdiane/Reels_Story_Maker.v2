@@ -61,6 +61,12 @@ function createStartImages({ store, products, router, lib, charRefs, productAnal
   function inputs(ep, scene, exclude = []) {
     const L = lib();
     const cast = scene.characters || [];
+    // an empty cast tells the image model "no recurring characters": a scene where Diane / Jack speak or are named would be drawn with random people
+    if (!cast.length) {
+      const names = Object.fromEntries((L.characters || []).map((c) => [c.id, [c.name, c.nameKo].filter(Boolean)]));
+      const guess = sceneLook.inferCast({ speakers: (ep.lines || []).filter((l) => l.sceneId === scene.id).map((l) => l.speaker), text: [scene.visual, scene.action].join('. ') }, new Set((L.characters || []).map((c) => c.id)), names);
+      if (guess.length) throw new StudioError('SCENE_CAST_EMPTY', `${scene.id}: 출연 캐릭터가 비어 있는데 대사나 설명에 ${guess.map((id) => (names[id] || [id])[0]).join(', ')}이(가) 나옵니다. 이대로 만들면 캐릭터 참조 없이 엉뚱한 인물이 그려집니다.`, { status: 409, details: { sceneId: scene.id, suggested: guess }, recovery: '이미지 편집의 "캐릭터 출연"에서 출연자를 선택하거나 "대사·설명으로 출연 자동 채우기"를 누르세요.' });
+    }
     // the ACTUAL approved image bytes of the characters in this scene (validated first; throws before any paid call)
     const ci = charRefs.inputsFor(ep, scene, { exclude });
     const images = ci.images.slice();
