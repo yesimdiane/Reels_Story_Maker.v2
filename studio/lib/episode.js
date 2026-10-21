@@ -200,6 +200,7 @@ function conceptState(c) {
   if (!c) return { done: true, detail: '' };
   if (c.legacy) return { done: true, detail: '스토리 랩 이전 에피소드' };
   if (c.ok) return { done: true, detail: `${c.conceptId} r${c.revision} 승인됨` };
+  if (c.canProceed) return { done: true, detail: c.note || '컨셉이 바뀌었지만 기존 대본으로 진행할 수 있습니다' }; // the script already exists: a later concept edit never blocks it
   return { done: false, attention: true, detail: c.note || '스토리 컨셉 승인 필요' };
 }
 

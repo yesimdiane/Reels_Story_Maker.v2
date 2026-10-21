@@ -610,7 +610,7 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
   async function approveScript(id, by = 'operator') {
     await store.episodes.update(id, (ep) => {
       const cs = scriptgen.conceptStatus(ep);
-      if (cs.linked && !cs.ok) throw new StudioError('CONCEPT_NOT_APPROVED', cs.note || '스토리 컨셉 승인이 필요합니다.', { recovery: cs.regenerationRequired ? 'Script Studio에서 "AI로 대본 다시 만들기"를 실행하세요.' : 'Story Lab에서 컨셉을 승인하세요.', status: 409 });
+      if (cs.linked && !cs.canProceed) throw new StudioError('CONCEPT_NOT_APPROVED', cs.note || '스토리 컨셉 승인이 필요합니다.', { recovery: cs.regenerationRequired ? 'Script Studio에서 "AI로 대본 다시 만들기"를 실행하세요.' : 'Story Lab에서 컨셉을 승인하세요.', status: 409 });
       const v = validateScript(ep, lib());
       if (!v.ok) throw new StudioError('INVALID_SCRIPT', v.errors[0].message, { details: v.errors, recovery: '오류를 고친 뒤 다시 승인하세요.', status: 409 });
       projects.assertProjectReady(ep); // every scene must be approved first (never approved silently)
@@ -875,7 +875,7 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
     const steps = derived.steps || [];
     const cur = steps.find((x) => x.state !== 'done') || null;
     const approvals = [
-      { key: 'story', label: '스토리', ok: !!(ep.story || ep.concept) && !!(derived.concept && derived.concept.ok !== false) },
+      { key: 'story', label: '스토리', ok: !!(ep.story || ep.concept) && !!(derived.concept && derived.concept.canProceed !== false) },
       { key: 'script', label: '대본', ok: !!derived.scriptApproved },
       { key: 'storyboard', label: '스토리보드', ok: !!(steps.find((x) => x.key === 'storyboard') || {}).state && steps.find((x) => x.key === 'storyboard').state === 'done' },
       { key: 'final', label: '최종', ok: !!(ep.approvals && ep.approvals.final) },

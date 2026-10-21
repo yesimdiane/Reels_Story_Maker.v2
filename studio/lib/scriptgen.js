@@ -366,8 +366,10 @@ function createScriptGen({ store, products, storylab, episodeIds, prompts, prese
     return {
       linked: true, conceptId: c.id, title: c.title, revision: c.revision, scriptRevision: usedRev, approved, scriptGenerated: !!ep.scriptSource,
       regenerationRequired: !!(ep.scriptSource && changed), ok: approved && !(ep.scriptSource && changed),
+      // an episode that already has its script is independent of later Story Lab edits: it may be approved and continue (only a NEW script needs an approved concept)
+      canProceed: (approved && !(ep.scriptSource && changed)) || !!ep.scriptSource,
       state: !approved ? 'not_approved' : changed && ep.scriptSource ? 'script_stale' : 'ok',
-      note: !approved ? '컨셉 승인이 취소되었거나 수정 후 재승인이 필요합니다.' : changed && ep.scriptSource ? `컨셉이 r${usedRev} → r${c.revision}로 바뀌었습니다. 대본을 다시 생성해야 합니다.` : '',
+      note: !approved ? (ep.scriptSource ? '컨셉이 수정되어 재승인이 필요합니다. 이 에피소드의 대본은 그대로 승인하고 진행할 수 있습니다 (새 대본을 만들 때만 컨셉 승인이 필요합니다).' : '컨셉 승인이 취소되었거나 수정 후 재승인이 필요합니다.') : changed && ep.scriptSource ? `컨셉이 r${usedRev} → r${c.revision}로 바뀌었습니다. 이 에피소드의 대본은 그대로 승인하고 진행할 수 있습니다. 바뀐 컨셉으로 대본을 새로 쓰려면 다시 만드세요.` : '',
     };
   }
 

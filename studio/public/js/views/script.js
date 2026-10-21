@@ -156,7 +156,7 @@ function conceptPanel(ep, d) {
     await act(() => api.post(`/api/episodes/${ep.id}/script/generate`, { confirm, overwrite }), { ok: '대본 초안을 만들었습니다 (검토 후 승인하세요)' });
   };
   return h('div', { class: 'card stack', style: 'gap:10px' },
-    h('div', { class: 'card-head' }, h('div', null, h('div', { class: 'eyebrow' }, '스토리 컨셉 → 대본'), h('h3', null, c.title || ep.concept.title)), c.ok ? chip(`${c.conceptId} r${c.revision} 승인됨`, 'done') : chip(c.state === 'script_stale' ? '컨셉이 바뀜 · 대본 재생성 필요' : '컨셉 승인 필요', 'attention')),
+    h('div', { class: 'card-head' }, h('div', null, h('div', { class: 'eyebrow' }, '스토리 컨셉 → 대본'), h('h3', null, c.title || ep.concept.title)), c.ok ? chip(`${c.conceptId} r${c.revision} 승인됨`, 'done') : chip(c.canProceed ? '컨셉이 바뀜 · 기존 대본으로 진행 가능' : '컨셉 승인 필요', 'attention')),
     !c.ok ? h('div', { class: 'banner warn' }, h('div', null, c.note, ' ', h('a', { href: '#/storylab/' + ep.productId }, 'Story Lab에서 확인'))) : null,
     src ? h('div', { class: 'small muted' }, `생성: ${src.mock ? '샘플 응답' : src.provider + ' / ' + src.model} · ${src.presetId ? '프리셋 ' + src.presetName + ' v' + src.presetVersion + ' · 강도 ' + src.comedyLevel : '대본 프롬프트 v' + src.promptVersion} · 컨셉 r${src.conceptRevision} · ${new Date(src.generatedAt).toLocaleString('ko-KR')}`) : h('div', { class: 'small muted' }, '아직 AI 대본이 없습니다. 직접 작성하거나 아래 버튼으로 초안을 만드세요.'),
     route.provider === 'mock' ? h('div', { class: 'small', style: 'color:var(--clay)' }, '대본 AI가 연결되지 않아 샘플 대본이 만들어집니다 (Settings → AI 연동).') : null,
