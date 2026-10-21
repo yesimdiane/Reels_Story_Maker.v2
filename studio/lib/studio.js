@@ -889,9 +889,15 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
       if (!done) phaseCur = true;
       return { key, label, state, done: mine.filter((x) => x.state === 'done').length, total: mine.length };
     });
-    const progressPct = steps.length ? Math.round(100 * steps.filter((x) => x.state === 'done').length / steps.length) : 0;
+    // The bar follows the CURRENT phase: image = approved start images / scenes; other phases = finished steps / steps.
+    const curPhase = phases.find((p) => p.state === 'current');
+    const scn = ep.scenes || [];
+    let prog = curPhase ? { done: curPhase.done, total: curPhase.total, unit: '단계' } : { done: 1, total: 1, unit: '' };
+    if (curPhase && curPhase.key === 'image' && scn.length) prog = { done: scn.filter((x) => x.startImage && x.startImage.approved).length, total: scn.length, unit: '컷 승인' };
+    const progressPct = prog.total ? Math.round(100 * prog.done / prog.total) : 0;
+    const progressText = curPhase ? `${curPhase.label} ${prog.done}/${prog.total}${prog.unit ? ' ' + prog.unit : ''}` : '모든 단계 완료';
     return {
-      phases, progressPct,
+      phases, progressPct, progressText,
       code: ep.displayId || ep.id, title: ep.title, productName: (ep.product || {}).name || '', productCode: ep.productCode || '', category: ep.category || (ep.concept && ep.concept.category) || '',
       stage: cur ? { key: cur.key, label: cur.label, state: cur.state } : { key: 'done', label: '완료', state: 'done' },
       approvals, approvedCount: approvals.filter((a) => a.ok).length,

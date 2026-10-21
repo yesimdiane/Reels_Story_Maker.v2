@@ -29,6 +29,7 @@ test('header: five phases in order, exactly one current, progress is a 0-100 num
   const cur = hd.phases.findIndex((p) => p.state === 'current');
   hd.phases.forEach((p, i) => assert.equal(p.state, i < cur ? 'done' : i === cur ? 'current' : 'todo'));
   assert.ok(hd.progressPct >= 0 && hd.progressPct < 100);
+  assert.match(hd.progressText, /\d+\/\d+/);
 });
 
 test('browser: stepper, progress bar and phase-specific resume button; metadata stays folded', { skip, timeout: 120000 }, async () => {
