@@ -170,6 +170,15 @@ export async function versionManager(e) {
 const CATS = { drama: '반전형 생활 개그', viral: '바이럴형', info: '신뢰·정보형' };
 const STAGE_VIEW = { product: 'products', concept: 'storylab', script: 'script', approval: 'script', storyboard: 'image', estimate: 'animation', animation: 'animation', clips: 'animation', voice: 'voice', render: 'render', review: 'review', publish: 'publishing' };
 
+const RESUME = { script: '대본 작업 이어하기', image: '이미지 작업 이어하기', video: '영상 제작 이어하기', review: '최종 검토 이어하기', publish: '게시 준비 이어하기' };
+const resumeLabel = (hd) => { const cur = (hd.phases || []).find((p) => p.state === 'current'); return cur ? RESUME[cur.key] : '결과 보기'; };
+
+/** 5-phase pipeline stepper: 대본 → 이미지 → 영상 제작 → 최종 검토 → 게시. */
+function stepper(hd) {
+  return h('ol', { class: 'ep-stepper', 'data-ep-stepper': '' }, (hd.phases || []).map((p, i) => h('li', { class: 'ep-step ' + p.state, 'data-phase': p.key, 'data-state': p.state, 'aria-current': p.state === 'current' ? 'step' : null },
+    h('span', { class: 'ep-dot' }, p.state === 'done' ? '✓' : String(i + 1)), h('span', { class: 'ep-step-label' }, p.label))));
+}
+
 /** Compact Episode header: code · title · product · category · stage · approvals · Resume Work. Advanced metadata sits in a collapsed panel. */
 export function episodeHeader(ep) {
   const hd = ep.derived && ep.derived.header;
@@ -182,11 +191,13 @@ export function episodeHeader(ep) {
       episodeMenu(row, { archivedView: hd.archived })),
     h('div', { class: 'ep-title' }, hd.title),
     h('div', { class: 'ep-meta' }, [hd.productName + (hd.productCode ? ` (${hd.productCode})` : ''), CATS[hd.category] || null].filter(Boolean).join(' · ')),
-    h('div', { class: 'ep-status' },
-      chip('단계: ' + hd.stage.label, hd.stage.state === 'attention' ? 'attention' : hd.stage.state === 'done' ? 'done' : ''),
-      chip(`승인 ${hd.approvedCount}/${hd.approvals.length}`, hd.approvedCount === hd.approvals.length ? 'done' : 'attention')),
+    stepper(hd),
+    h('div', { class: 'ep-progress', 'data-ep-progress': '' },
+      h('div', { class: 'ep-bar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': hd.progressPct, 'aria-label': '진행률' }, h('span', { style: `width:${hd.progressPct}%` })),
+      h('span', { class: 'ep-pct', title: hd.progressText }, hd.progressPct + '%')),
+    h('div', { class: 'small muted', 'data-ep-progress-text': '' }, hd.progressText),
     h('div', { class: 'ep-actions' },
-      h('button', { class: 'btn', type: 'button', 'data-resume-work': '', onclick: () => { location.hash = '#/' + target + '/' + (['products', 'storylab'].includes(target) ? ep.productId : ep.id); } }, '이어서 작업 ', icon('play'))),
+      h('button', { class: 'btn sage', type: 'button', 'data-resume-work': '', onclick: () => { location.hash = '#/' + target + '/' + (['products', 'storylab'].includes(target) ? ep.productId : ep.id); } }, resumeLabel(hd), ' ', icon('play'))),
     hd.onHold && hd.holdReason ? h('div', { class: 'small muted' }, '보류 사유: ' + hd.holdReason) : null,
     h('details', { class: 'small', 'data-ep-advanced': '' }, h('summary', { style: 'cursor:pointer;min-height:32px;display:flex;align-items:center' }, '상세 정보'),
       h('div', { class: 'stack', style: 'gap:2px;margin-top:4px' }, [`내부 ID: ${ep.uuid || '-'}`, `대본 v${ep.version || 0}${ep.story ? ' · 스토리 v' + ep.story.revision : ''}`, `생성: ${ep.createdAt ? new Date(ep.createdAt).toLocaleString('ko-KR') : '-'}`, `수정: ${ep.updatedAt ? new Date(ep.updatedAt).toLocaleString('ko-KR') : '-'}`].map((t) => h('div', { class: 'muted mono' }, t)))));

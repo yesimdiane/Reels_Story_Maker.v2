@@ -882,7 +882,24 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
       { key: 'storyboard', label: '스토리보드', ok: !!(steps.find((x) => x.key === 'storyboard') || {}).state && steps.find((x) => x.key === 'storyboard').state === 'done' },
       { key: 'final', label: '최종', ok: !!(ep.approvals && ep.approvals.final) },
     ];
+    const PHASES = [['script', '대본', ['product', 'concept', 'script', 'approval']], ['image', '이미지', ['storyboard']], ['video', '영상 제작', ['estimate', 'animation', 'clips', 'voice']], ['review', '최종 검토', ['render', 'review']], ['publish', '게시', ['publish']]];
+    let phaseCur = false;
+    const phases = PHASES.map(([key, label, keys]) => {
+      const mine = steps.filter((x) => keys.includes(x.key));
+      const done = mine.length > 0 && mine.every((x) => x.state === 'done');
+      const state = done ? 'done' : !phaseCur ? 'current' : 'todo';
+      if (!done) phaseCur = true;
+      return { key, label, state, done: mine.filter((x) => x.state === 'done').length, total: mine.length };
+    });
+    // The bar follows the CURRENT phase: image = approved start images / scenes; other phases = finished steps / steps.
+    const curPhase = phases.find((p) => p.state === 'current');
+    const scn = ep.scenes || [];
+    let prog = curPhase ? { done: curPhase.done, total: curPhase.total, unit: '단계' } : { done: 1, total: 1, unit: '' };
+    if (curPhase && curPhase.key === 'image' && scn.length) prog = { done: scn.filter((x) => x.startImage && x.startImage.approved).length, total: scn.length, unit: '컷 승인' };
+    const progressPct = prog.total ? Math.round(100 * prog.done / prog.total) : 0;
+    const progressText = curPhase ? `${curPhase.label} ${prog.done}/${prog.total}${prog.unit ? ' ' + prog.unit : ''}` : '모든 단계 완료';
     return {
+      phases, progressPct, progressText,
       code: ep.displayId || ep.id, title: ep.title, productName: (ep.product || {}).name || '', productCode: ep.productCode || '', category: ep.category || (ep.concept && ep.concept.category) || '',
       stage: cur ? { key: cur.key, label: cur.label, state: cur.state } : { key: 'done', label: '완료', state: 'done' },
       approvals, approvedCount: approvals.filter((a) => a.ok).length,
