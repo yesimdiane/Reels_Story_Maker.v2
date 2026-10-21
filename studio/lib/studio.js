@@ -24,7 +24,6 @@ const { createManychat } = require('./manychat');
 const { createUniverseService } = require('./universes');
 const { createSceneRegen } = require('./sceneregen');
 const { createScriptPresets } = require('./scriptpresets');
-const { createEndingTemplates } = require('./endingtemplates');
 const F = require('./formula');
 const SF = require('./scriptformula');
 const { createStartImages } = require('./startimages');
@@ -73,7 +72,6 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
   const storylab = createStoryLab({ store, products, prompts, router, universes: () => universes, log });
   universes = createUniverseService({ store, episodes: () => store.episodes.list(), storylabCasts: () => storylab.allCasts() });
   const presets = createScriptPresets({ store, prompts, seedDir: SEED_DIR });
-  const endings = createEndingTemplates({ store, seedDir: SEED_DIR });
   const episodeIds = createEpisodeIds({ store, products });
   const scriptgen = createScriptGen({ store, products, storylab, episodeIds, prompts, presets, router, lib: () => store.characters.load(), universes: () => universes });
   const sceneRegen = createSceneRegen({ store, storylab, router, universes, lib: () => store.characters.load(), charRefs: { textNote: (...a) => charRefs.textNote(...a) }, saveScene: (...a) => saveScene(...a), assertNotHeld: (...a) => assertNotHeld(...a), log });
@@ -1589,7 +1587,7 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
   const exportName = (id, file) => `${(store.episodes.get(id).displayId || id)}_${require('node:path').basename(file)}`;
 
   return {
-    exportName, sceneFlow, animGate, lipsync, uploadMusic, videoEdit, sfx, cfg, characterView, aiDiagnostics, store, video, gen, startImages, productAnalysis, charRefs, brollImages, animplan, renderReadiness, presets, endings, voice, renderer, publishing, vault: keys, runtime, usage, prompts, router, products, storylab, universes, sceneRegen, voiceCatalog, scriptgen, integrations, createEpisodeFromConcept, migrateLegacy, projects, translator, cutPresets, saveInserts, cutFrame,
+    exportName, sceneFlow, animGate, lipsync, uploadMusic, videoEdit, sfx, cfg, characterView, aiDiagnostics, store, video, gen, startImages, productAnalysis, charRefs, brollImages, animplan, renderReadiness, presets, voice, renderer, publishing, vault: keys, runtime, usage, prompts, router, products, storylab, universes, sceneRegen, voiceCatalog, scriptgen, integrations, createEpisodeFromConcept, migrateLegacy, projects, translator, cutPresets, saveInserts, cutFrame,
     saveOutfitLock, summary, episodeView, episodeIds, sba, performance, manychat, setEpisodeCategory, holdEpisode, resumeEpisode, assertNotHeld, editEpisode, providerStatus, createEpisode, saveScript, approveScript, revokeScript, restoreVersion, addSuggestion,
     rebuildPrompts, savePrompt, setSceneTitle, reorderScenes, saveScene, addScene, duplicateScene, deleteScene, trashEpisode, restoreEpisode, trashList, archiveEpisode, unarchiveEpisode, episodeImpact, scriptVersions, deleteScriptVersion, undeleteScriptVersion, setStartImage, uploadStartFrame, approveStartFrame, deleteStartFrame, saveImagePrompt, resetImagePrompt, approveStoryboard, revokeStoryboard, saveAnimationSettings, addCustomModel, removeCustomModel, confirmModel, muapiCliModels, confirmMuapiTts, muapiCheck, setSpendLimit,
     updateCharacter, characterView, promptStatus: promptSvc.status, saveSettings, loadDemoReferences, uploadSfx, updateSfx, mediaFile,

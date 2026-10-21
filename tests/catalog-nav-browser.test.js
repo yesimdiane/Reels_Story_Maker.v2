@@ -271,9 +271,9 @@ test('Settings has three groups with compact one-line secondary navs; both promp
     const leaves = {
       general: { tabs: ['general', 'costs', 'usage'], probe: { general: '인스턴스', costs: '비용 한도와 가격 추정', usage: null } },
       ai: { tabs: ['ai', 'connections', 'prompts', 'autodm'] },
-      media: { tabs: ['characters', 'voices', 'endings'] },
+      media: { tabs: ['characters', 'voices'] },
     };
-    const sel = { general: 'text=렌더링', costs: 'text=비용 한도와 가격 추정', ai: '[data-ai-routing-table]', connections: '[data-muapi-card]', prompts: '[data-prompt-management]', autodm: '[data-autodm-panel]', characters: '[data-character-library]', voices: '[data-voice-connections]', endings: 'text=엔딩' };
+    const sel = { general: 'text=렌더링', costs: 'text=비용 한도와 가격 추정', ai: '[data-ai-routing-table]', connections: '[data-muapi-card]', prompts: '[data-prompt-management]', autodm: '[data-autodm-panel]', characters: '[data-character-library]', voices: '[data-voice-connections]' };
     for (const [g, def] of Object.entries(leaves)) {
       await page.locator(`[data-settings-group=${g}]`).click();
       await page.waitForSelector(`[data-settings-sub=${g}]`);
@@ -301,10 +301,14 @@ test('Settings has three groups with compact one-line secondary navs; both promp
     await page.goto(`${base}/#/settings/scriptprompts`);
     await page.waitForSelector('[data-prompt-pane=presets]');
     await until(page, () => { const b = document.querySelector('[data-settings-sub=ai] [data-settings-tab=prompts]'); return b && b.getAttribute('aria-selected') === 'true'; });
-    for (const [old, group] of [['general', 'general'], ['ai', 'ai'], ['connections', 'ai'], ['voices', 'media'], ['prompts', 'ai'], ['endings', 'media'], ['usage', 'general'], ['characters', 'media']]) {
+    for (const [old, group] of [['general', 'general'], ['ai', 'ai'], ['connections', 'ai'], ['voices', 'media'], ['prompts', 'ai'], ['usage', 'general'], ['characters', 'media']]) {
       await page.goto(`${base}/#/settings/${old}`);
       await until(page, ([g, t]) => { const b = document.querySelector(`[data-settings-sub=${g}] [data-settings-tab=${t}]`); return b && b.getAttribute('aria-selected') === 'true'; }, [group, old]).catch((e) => { throw new Error('#/settings/' + old + ': ' + e.message); });
     }
+    // the ending templates were removed: the old address opens the first Settings tab instead of an error
+    await page.goto(`${base}/#/settings/endings`);
+    await until(page, () => { const b = document.querySelector('[data-settings-sub=general] [data-settings-tab=general]'); return b && b.getAttribute('aria-selected') === 'true'; });
+    assert.equal(await page.locator('#stage .banner.err').count(), 0);
     await page.goto(`${base}/#/characters`);
     await page.waitForSelector('[data-character-library]');
     assert.equal(await page.evaluate(() => location.hash), '#/settings/characters');

@@ -181,7 +181,7 @@ test('HTTP: estimate / generate enforce the same rules (422) and return categori
   } finally { await new Promise((r) => app.close(r)); }
 });
 
-test('maximum video length: the operator types seconds (10–90, default 45); the AI is told, longer concepts are refused, the value is stored', async () => {
+test('maximum video length: the operator types seconds (10–90, default 45); the AI is told, a longer concept is only a guide (kept, never refused), the value is stored', async () => {
   const bad = (v) => assert.throws(() => cats.resolveRequest({ category: 'drama', maxDurationSec: v }), (e) => e.code === 'INVALID_DURATION' && e.status === 422, String(v));
   [9, 91, 45.5, 'abc', -5, 0].forEach(bad);
   assert.equal(cats.resolveRequest({ category: 'drama' }).maxDurationSec, 45);
@@ -194,12 +194,14 @@ test('maximum video length: the operator types seconds (10–90, default 45); th
   assert.match(ai.calls[0].prompt, /MAX_DURATION_SEC: 60/);
   assert.equal(lab.concepts[0].maxDurationSec, 60);
   assert.equal(lab.batches[0].maxDurationSec, 60);
-  // an answer that overshoots the limit is rejected (nothing saved)
+  // an answer that overshoots the limit is NOT rejected: the maximum is a guide for the AI, the longer estimate is kept
   const ai2 = fakeAi({ '*': () => ({ text: '', json: goodConcepts(1, '', ['drama']), usage: { inputTokens: 1, outputTokens: 1 } }) }); // 40 s
   const m2 = await setup(ai2);
-  await assert.rejects(m2.s.storylab.generate(m2.pid, { category: 'drama', maxDurationSec: 30, confirm: CONFIRM }), (e) => e.code === 'CONCEPTS_REJECTED' && /최대 30초/.test(e.details.join(' ')));
-  assert.equal(m2.s.storylab.list(m2.pid).concepts.length, 0);
-  assert.equal((await m2.s.storylab.generate(m2.pid, { category: 'drama', maxDurationSec: 40, confirm: CONFIRM })).concepts.length, 1);
+  const over = await m2.s.storylab.generate(m2.pid, { category: 'drama', maxDurationSec: 30, confirm: CONFIRM });
+  assert.equal(over.concepts.length, 1, 'accepted although the estimate is above 30 s');
+  assert.equal(over.concepts[0].maxDurationSec, 30);
+  assert.ok(over.concepts[0].estimatedDurationSec > 30, 'the longer estimate is kept as it is');
+  assert.match(ai2.calls[0].prompt, /MAX_DURATION_SEC: 30/, 'the AI is still told the limit');
   // the sample route honours it too
   const m3 = make();
   const p3 = await readyProduct(m3.s);

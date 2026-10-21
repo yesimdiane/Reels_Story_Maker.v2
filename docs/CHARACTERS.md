@@ -3,7 +3,7 @@
 시리즈마다 다른 출연진을 쓰기 위한 구조화 데이터입니다. 프롬프트에 캐릭터를 박아 넣지 않고, 선택한 유니버스와 캐릭터 프로필에서 코드가 프롬프트 블록을 만듭니다.
 
 ## 데이터 (`/data/characters.json`, schema 2)
-- **universes[]**: id, 이름, 설명, 기본 스토리 스타일, 기본 언어, 시각 스타일, 고정 엔딩 템플릿(`endingTemplateId`), 활성/비활성. 기본 제공: `jackdiane`(Jack & Diane), `gregory-cats`(Gregory Cats). 새 유니버스는 만들기·수정·삭제 가능(기본 제공·캐릭터가 있는·프로젝트가 쓰는 유니버스는 삭제 불가, 비활성화만).
+- **universes[]**: id, 이름, 설명, 기본 스토리 스타일, 기본 언어, 시각 스타일, 활성/비활성. 기본 제공: `jackdiane`(Jack & Diane), `gregory-cats`(Gregory Cats). 새 유니버스는 만들기·수정·삭제 가능(기본 제공·캐릭터가 있는·프로젝트가 쓰는 유니버스는 삭제 불가, 비활성화만).
 - **characters[]**: 기존 필드(외모=`look`, 참조 이미지, 음성) + `universeId`, 역할, 성격, 말투, 말버릇(`catchphrases`), 관계(`relationships`), 행동 규칙, 금지 행동(`negativePrompts`).
 - 초기 캐릭터: Jack, Diane(기존 그대로), Cloud(Ragdoll, 책임감 있는 장남), Louie(Korean shorthair, 장난꾸러기 둘째), Lucy(Korean shorthair, 막내 공주). **고양이 외모는 지어내지 않고** 승인된 참조 이미지로만 정의합니다.
 - Jack의 HeyGen `d51329d2…`는 **Identity ID** 칸에 저장됩니다. Voice ID로 취급하지 않으며, Voice ID는 직접 입력하고 HeyGen 목록으로 확인해야 쓰입니다.
@@ -16,7 +16,6 @@
 
 ## 에피소드 · 대본 · 스토리보드
 - 에피소드에 `universeId`, `cast`, `characters`가 저장되고 대본의 장면 출연·대사 화자는 그 출연진으로 제한됩니다(밖의 캐릭터는 검증 오류 `OUT_OF_CAST`). 장면마다 출연 캐릭터를 바꿀 수 있습니다(씬 저장으로 반영).
-- **고정 엔딩 3컷은 유니버스마다 같은 형식**(핑계 → 제품 시연 → 시리즈 고정 개그)으로 둡니다. Gregory Cats 버전: Lucy의 쇼핑 요구 → Louie의 제품 시연 → Cloud의 한결같은 거절·Lucy의 "CLOUD!!!". 엔딩 출연이 선택한 캐릭터를 벗어나면 에피소드 생성 시 **명시적 승인**이 필요합니다.
 - Jack & Diane 외 유니버스의 대본 프롬프트는 캐릭터 중립 문구(코드)로 바뀌고 화자 ID 목록은 출연진에서 만듭니다.
 
 ## 렌더 · 음성
