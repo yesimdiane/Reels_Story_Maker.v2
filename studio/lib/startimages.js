@@ -47,7 +47,7 @@ function createStartImages({ store, products, router, lib, charRefs, productAnal
       `SCENE ${scene.id}: ${scene.title || ''}`,
       'VISUAL: ' + (scene.visual || '(not described)'),
       scene.action ? 'ACTION AT THE FIRST FRAME: ' + scene.action : '',
-      ...sceneLook.promptLines(scene, lib()),
+      ...sceneLook.promptLines(scene, lib(), { still: true }),
     ].filter(Boolean).join('\n');
   }
   /** What is sent: the operator's saved text when they edited it, otherwise the automatic text. */
@@ -81,9 +81,23 @@ function createStartImages({ store, products, router, lib, charRefs, productAnal
       files.forEach((f) => { const buf = fs.readFileSync(f.path); images.push({ label: 'APPROVED product reference (the product must match this exactly: shape, logo, colour, function):', mimeType: f.mimeType, data: buf.toString('base64') }); productParts.push({ assetId: `${ep.productId}:${f.id}`, filename: f.id, url: `/media/product/${ep.productId}/${f.id}`, bytes: buf.length, mime: f.mimeType, name: (ep.product || {}).name }); });
       productIds = files.map((f) => f.id);
     }
+    // SCENE CONTINUITY references: the already generated / uploaded image of other scenes the operator picked (same room, light, props).
+    // A picked scene without a usable image is refused (nothing is dropped silently); the people in it must NOT be copied.
+    const sceneParts = []; const sceneRefsUsed = [];
+    (scene.sceneRefs || []).forEach((rid) => {
+      const other = (ep.scenes || []).find((x) => x.id === rid);
+      const si = other && other.startImage;
+      const file = si && si.file ? store.episodes.file(ep.id, 'startframes', si.file) : '';
+      if (!other || !si || si.placeholder || !file || !fs.existsSync(file)) throw new StudioError('SCENE_REF_MISSING', `${scene.id}: 참조로 고른 ${rid} 씬의 이미지가 없습니다. 그 씬의 이미지를 먼저 만들거나 참조에서 빼 주세요.`, { status: 409, details: { sceneId: scene.id, refSceneId: rid }, recovery: '이미지 편집의 "참조 이미지 → 씬 이미지"에서 선택을 바꾸세요.' });
+      const buf = fs.readFileSync(file);
+      const mime = (sniffImage(buf) || {}).mime || 'image/png';
+      images.push({ label: `SCENE CONTINUITY reference: the image of scene ${rid}. Keep the SAME setting — room layout, wall / tile colours, lighting tone, props and where they are. Do NOT copy the people in it: the characters of THIS scene come only from their character references.`, mimeType: mime, data: buf.toString('base64') });
+      sceneParts.push({ assetId: `scene:${rid}`, filename: si.file, url: `/media/startframe/${ep.id}/${rid}`, bytes: buf.length, mime, name: `${rid} 씬 이미지` });
+      sceneRefsUsed.push({ sceneId: rid, sha256: si.sha256 || sha256(buf), approved: !!si.approved });
+    });
     // The approved structure description rides along ONLY with the real product images that are attached (text alone never replaces the reference image).
     const pctx = productIds.length && productAnalysis ? productAnalysis.contextFor(ep.productId, productIds) : null;
-    try { charRefs.enforce({ chars: ci.chars, product: productParts.concat(outfit.images.map((im, i) => ({ assetId: 'outfit-lock-' + i, name: im.label }))) }); } catch (e) { if (e.details) e.details.sceneId = scene.id; e.message = `${scene.id}: ${e.message}`; throw e; } // model input limits, before any paid call
+    try { charRefs.enforce({ chars: ci.chars, scenes: sceneParts, product: productParts.concat(outfit.images.map((im, i) => ({ assetId: 'outfit-lock-' + i, name: im.label }))) }); } catch (e) { if (e.details) e.details.sceneId = scene.id; e.message = `${scene.id}: ${e.message}`; throw e; } // model input limits, before any paid call
     const facts = scene.showsProduct ? (ep.product.verifiedFeatures || []) : [];
     const prompt = [
       headFor(ep, scene),
@@ -92,11 +106,12 @@ function createStartImages({ store, products, router, lib, charRefs, productAnal
       ...ci.lines,
       ...outfit.instructions,
       cast.length ? SHEET_RULE : '',
+      sceneRefsUsed.length ? `SCENE CONTINUITY: ${sceneRefsUsed.length > 1 ? 'the attached scene images (' + sceneRefsUsed.map((r) => r.sceneId).join(', ') + ') show' : 'the attached scene image (' + sceneRefsUsed[0].sceneId + ') shows'} the SAME place as this scene. Match its setting, lighting and props; draw only the characters listed in CAST, with their own character references.` : '',
       pctx && pctx.block ? pctx.block : '',
       scene.showsProduct && productIds.length ? 'The product appears in this scene: draw it EXACTLY like the approved product reference(s). Never add features. Verified facts only: ' + (facts.join('; ') || 'none') : 'Do NOT show the product in this frame.',
       'No text, captions, subtitles, speech bubbles, logos or watermarks anywhere in the image.',
     ].filter(Boolean).join('\n');
-    return { images, prompt, used, productIds, productContext: pctx ? pctx.record : null, productWarnings: pctx ? pctx.warnings : [] };
+    return { images, prompt, used, sceneRefsUsed, productIds, productContext: pctx ? pctx.record : null, productWarnings: pctx ? pctx.warnings : [] };
   }
 
   function estimate(epId, sceneIds, opts = {}) {
@@ -159,7 +174,7 @@ function createStartImages({ store, products, router, lib, charRefs, productAnal
           if (s.startImage && s.startImage.type === 'upload' && s.startImage.file && !vers.some((x) => x.file === s.startImage.file)) vers.push({ v: vers.length + 1, file: s.startImage.file, sha256: s.startImage.sha256 || null, name: s.startImage.name || '', generated: !!s.startImage.generated, provider: s.startImage.provider || '', model: s.startImage.model || '', createdAt: s.startImage.createdAt || null, productContext: s.startImage.productContext || null, earlier: true });
           const nv = vers.length + 1;
           vers.push({ v: nv, file, sha256: hash, name: `AI 시작 프레임 ${scene.id} V${nv}`, generated: true, provider: out.provider, model: out.model, createdAt: nowIso(), forced: !!force, requestFingerprint, sameAsPrevious, productContext, characterRefAssetIds: q.used.map((u) => u.assetId) });
-          s.startImage = { type: 'upload', file, sha256: hash, approved: false, generated: true, version: nv, name: `AI 시작 프레임 ${scene.id}`, provider: out.provider, model: out.model, prompt: q.prompt, characterRefs: q.used, characterRefAssetIds: q.used.map((u) => u.assetId), productImageIds: q.productIds, productContext, createdAt: nowIso(), createdBy: by, generationDiagnostics: { requestFingerprint, forced: !!force, submittedToProvider: true, sameAsPrevious } };
+          s.startImage = { type: 'upload', file, sha256: hash, approved: false, generated: true, version: nv, name: `AI 시작 프레임 ${scene.id}`, provider: out.provider, model: out.model, prompt: q.prompt, sceneRefs: q.sceneRefsUsed, characterRefs: q.used, characterRefAssetIds: q.used.map((u) => u.assetId), productImageIds: q.productIds, productContext, createdAt: nowIso(), createdBy: by, generationDiagnostics: { requestFingerprint, forced: !!force, submittedToProvider: true, sameAsPrevious } };
         });
         store.episodes.audit(epId, 'startimage.generated', { sceneId: scene.id, provider: out.provider, model: out.model, file, requestFingerprint, forced: !!force, submittedToProvider: true, sameAsPrevious, referenceImageSetVersion: productContext ? productContext.referenceImageSetVersion : null, structureVersion: productContext ? productContext.structureVersion : null });
         generated.push({ sceneId: scene.id, file, requestFingerprint, sameAsPrevious, provider: out.provider, model: out.model, productContext });

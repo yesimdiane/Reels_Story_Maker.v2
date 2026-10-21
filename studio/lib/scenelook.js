@@ -85,8 +85,35 @@ function inferCast({ characters = [], speakers = [], text = '' } = {}, knownIds,
   return out;
 }
 
-/** English lines for image / video prompts. Reference-only characters are named as NOT to be depicted. */
-function promptLines(scene, lib) {
+// Camera MOVEMENT (video) next to the camera SHOT (framing). Stored as a normal `camera` element whose text starts with "Camera movement:".
+const MOVE_PREFIX = 'Camera movement: ';
+const CAMERA_MOVES = [
+  ['static', 'Static', '고정', 'locked-off, no camera movement'],
+  ['pan_left', 'Pan Left', '패닝 왼쪽', 'the camera pans left on a fixed position'],
+  ['pan_right', 'Pan Right', '패닝 오른쪽', 'the camera pans right on a fixed position'],
+  ['tilt_up', 'Tilt Up', '틸트 위', 'the camera tilts up'],
+  ['tilt_down', 'Tilt Down', '틸트 아래', 'the camera tilts down'],
+  ['zoom_in', 'Zoom In', '줌 인', 'a smooth zoom in'],
+  ['zoom_out', 'Zoom Out', '줌 아웃', 'a smooth zoom out'],
+  ['dolly_in', 'Dolly In', '돌리 인', 'the camera moves forward (dolly in) toward the subject'],
+  ['dolly_out', 'Dolly Out', '돌리 아웃', 'the camera moves backward (dolly out) away from the subject'],
+  ['tracking', 'Tracking Shot', '트래킹', 'the camera follows the moving subject (tracking shot)'],
+  ['handheld', 'Handheld', '핸드헬드', 'realistic handheld camera with subtle shake and life'],
+];
+const isMove = (text) => String(text || '').startsWith(MOVE_PREFIX);
+const moveText = (text) => { const k = String(text || '').slice(MOVE_PREFIX.length).trim(); const m = CAMERA_MOVES.find((x) => x[1] === k); return m ? `${m[1]} — ${m[3]}` : k; };
+
+/** other scenes whose generated / uploaded start image is attached as a CONTINUITY reference (same place, light, props): known ids, never itself, at most 2 */
+const MAX_SCENE_REFS = 2;
+function cleanSceneRefs(raw, selfId, knownIds, prev) {
+  const src = Array.isArray(raw) ? raw : prev || [];
+  const known = knownIds instanceof Set ? knownIds : new Set(knownIds || []);
+  const out = [...new Set(src.map(String))].filter((id) => id && id !== selfId && known.has(id)).slice(0, MAX_SCENE_REFS);
+  return out.length ? out : undefined;
+}
+
+/** English lines for image / video prompts. Reference-only characters are named as NOT to be depicted. { still: true } = a still image: camera MOVEMENT is for the video only. */
+function promptLines(scene, lib, { still = false } = {}) {
   const name = (id) => ((lib.characters || []).find((c) => c.id === id) || { name: id }).name;
   const l = scene.look || {};
   const p = scene.pose || {};
@@ -103,7 +130,10 @@ function promptLines(scene, lib) {
   if (of('eyes').length) out.push('EYES: ' + of('eyes').join('; '));
   if (of('eyebrows').length) out.push('EYEBROWS: ' + of('eyebrows').join('; '));
   if (of('mouth').length) out.push('MOUTH: ' + of('mouth').join('; '));
-  if (of('camera').length) out.push('CAMERA / SHOT: ' + of('camera').join('; '));
+  const shots = of('camera').filter((t) => !isMove(t));
+  const moves = of('camera').filter(isMove);
+  if (shots.length) out.push('CAMERA / SHOT: ' + shots.join('; '));
+  if (moves.length && !still) out.push('CAMERA MOVEMENT (animate it over the whole clip): ' + moves.map(moveText).join('; '));
   if ((scene.referenceOnly || []).length) out.push(`Reference-only characters (${scene.referenceOnly.map(name).join(', ')}) are for appearance continuity only and are NOT in this scene: do not draw them.`);
   return out;
 }
@@ -111,4 +141,4 @@ function promptLines(scene, lib) {
 /** content for the storyboard approval hash; empty → null so approvals made before these fields existed keep their hash */
 const lookHashPart = (s) => (s.look || s.pose ? { look: s.look || null, pose: s.pose || null } : null);
 
-module.exports = { inferCast, cleanElements, deriveText, ELEMENT_TYPES, cleanLook, cleanPose, cleanReferenceOnly, promptLines, lookHashPart, LOOK_KEYS, POSE_KEYS };
+module.exports = { CAMERA_MOVES, MOVE_PREFIX, MAX_SCENE_REFS, cleanSceneRefs, inferCast, cleanElements, deriveText, ELEMENT_TYPES, cleanLook, cleanPose, cleanReferenceOnly, promptLines, lookHashPart, LOOK_KEYS, POSE_KEYS };

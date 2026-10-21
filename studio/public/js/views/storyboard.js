@@ -12,7 +12,7 @@ import { charRefsPanelBody, charRefsBadge } from './scene-charrefs.js';
 import { openBrollAi, previewBroll } from './broll-ai.js';
 import { openAnimGenerate } from './anim-plan.js';
 import { motionPanel } from './beat-timeline.js';
-import { block, shotChips, dialoguePanelBody, animationHandoff, imagePromptBody, frameProvenance } from './storyboard-sections.js';
+import { block, shotChips, moveChips, dialoguePanelBody, animationHandoff, imagePromptBody, frameProvenance } from './storyboard-sections.js';
 import { lookFields, characterRoles, poseFields, elementsBlock, seedElements } from './script-sections.js';
 import { stepper, audioPanelBody, audioBadge, composePanelBody, composeBadge } from './scene-flow.js';
 import { sceneGallery } from './scene-gallery.js';
@@ -152,7 +152,7 @@ function sceneCard(ep, sc, i, chars, go) {
 
   // structured image fields (environment, roles, pose, elements): a working copy of the SAME scene fields Script Studio edits
   const sdKey = 'sbs:' + ep.id + ':' + sc.id;
-  const sd = (state.draft[sdKey] = state.draft[sdKey] || { characters: (sc.characters || []).slice(), referenceOnly: (sc.referenceOnly || []).slice(), action: sc.action || '', emotion: sc.emotion || '', look: Object.assign({}, sc.look || {}), pose: Object.assign({}, sc.pose || {}), elements: Array.isArray(sc.elements) ? sc.elements.map((e) => Object.assign({}, e)) : undefined, dirty: false });
+  const sd = (state.draft[sdKey] = state.draft[sdKey] || { characters: (sc.characters || []).slice(), referenceOnly: (sc.referenceOnly || []).slice(), action: sc.action || '', emotion: sc.emotion || '', look: Object.assign({}, sc.look || {}), pose: Object.assign({}, sc.pose || {}), sceneRefs: (sc.sceneRefs || []).slice(), elements: Array.isArray(sc.elements) ? sc.elements.map((e) => Object.assign({}, e)) : undefined, dirty: false });
   sd.id = sc.id;
   const castList = chars.filter((c) => (ep.characters || []).includes(c.id));
   const structNote = h('span', { class: 'small', 'data-sb-dirty': sc.id, style: 'color:var(--clay)' });
@@ -163,7 +163,7 @@ function sceneCard(ep, sc, i, chars, go) {
     const place = readPlace();
     const scene = { id: sc.id, showsProduct: !!d.showsProduct };
     if (d.showsProduct) scene.productPlacement = place;
-    if (sd.dirty) Object.assign(scene, { characters: sd.characters, referenceOnly: sd.referenceOnly, look: sd.look, pose: sd.pose, elements: sd.elements });
+    if (sd.dirty) Object.assign(scene, { characters: sd.characters, referenceOnly: sd.referenceOnly, sceneRefs: sd.sceneRefs, look: sd.look, pose: sd.pose, elements: sd.elements });
     const ops = [];
     if (sd.dirty || scene.showsProduct !== !!sc.showsProduct || d.showsProduct) ops.push(() => api.put(`/api/episodes/${ep.id}/scenes/${sc.id}`, { scene }));
     await act(async () => { for (const o of ops) await o(); if (sc.prompt && (d.video !== serverVideo || d.negative !== serverNeg)) await api.put(`/api/episodes/${ep.id}/scenes/${sc.id}/prompt`, { video: d.video, negative: d.negative }); delete state.draft[sdKey]; return null; });
@@ -228,6 +228,23 @@ function sceneCard(ep, sc, i, chars, go) {
   const drawRoles = () => rolesBox.replaceChildren(characterRoles(ep, sd, castList, sdDirty, () => drawRoles()));
   drawRoles();
   seedElements(sd);
+  // 씬 이미지 참조 (연속성): other scenes whose image is sent along as a reference for the SAME place, light and props (never the people in it)
+  const imgOf = (s2) => (s2.startImageInfo && s2.startImageInfo.url && !s2.startImageInfo.error && !s2.startImageInfo.placeholder ? s2.startImageInfo : null);
+  const refCandidates = ep.scenes.filter((x) => x.id !== sc.id && imgOf(x));
+  const prevScene = ep.scenes[i - 1] && imgOf(ep.scenes[i - 1]) ? ep.scenes[i - 1] : null;
+  const toggleRef = (rid, on) => {
+    const set = new Set(sd.sceneRefs);
+    if (on) { if (set.size >= 2) return toast('씬 이미지는 최대 2장까지 참조할 수 있습니다.', { error: true }); set.add(rid); } else set.delete(rid);
+    sd.sceneRefs = [...set]; sdDirty(); rerender();
+  };
+  const sceneRefsBox = h('div', { class: 'stack', style: 'gap:6px', 'data-scene-refs': sc.id },
+    h('div', { class: 'eyebrow' }, '씬 이미지 (장소 · 조명 · 소품 연속성)'),
+    h('div', { class: 'small muted' }, '이미 만든 다른 씬의 이미지를 참조로 함께 보냅니다. 같은 욕실 타일, 조명 톤, 소품 위치를 맞추는 용도이며, 그 이미지 속 인물은 따라 그리지 않습니다 (인물은 캐릭터 참조로만 그려집니다). 최대 2장.'),
+    prevScene ? h('label', { class: 'small row', style: 'gap:6px;cursor:pointer' }, h('input', { type: 'checkbox', 'data-scene-ref-prev': prevScene.id, checked: sd.sceneRefs.includes(prevScene.id), onchange: (e) => toggleRef(prevScene.id, e.target.checked) }), `바로 앞 씬(${prevScene.id}) 이미지 참조`) : null,
+    refCandidates.length ? h('div', { class: 'row', style: 'gap:10px;flex-wrap:wrap' }, refCandidates.map((x) => h('label', { class: 'small', style: 'display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer' },
+      previewImage({ url: imgOf(x).url, alt: x.id, compact: true, tag: x.id, cls: 'sb-thumb', style: 'width:44px;aspect-ratio:9/16;object-fit:cover;border-radius:6px' }),
+      h('span', { class: 'row', style: 'gap:4px' }, h('input', { type: 'checkbox', 'data-scene-ref': x.id, checked: sd.sceneRefs.includes(x.id), onchange: (e) => toggleRef(x.id, e.target.checked) }), x.id)))) : h('div', { class: 'small muted' }, '참조할 수 있는 다른 씬의 이미지가 아직 없습니다.'),
+    sd.dirty ? h('div', { class: 'small', style: 'color:var(--clay)' }, '"이미지 설정 저장"을 눌러야 적용됩니다.') : null);
   const redrawCamera = () => rerender();
   for (const pk of ['look', 'charrefs']) { const u = uiState(); const k = `sb:${ep.id}:${sc.id}:${pk}`; if (u.open[k] === undefined) u.open[k] = true; } // the structured image fields are open by default
   const imageEditors = [
@@ -238,8 +255,8 @@ function sceneCard(ep, sc, i, chars, go) {
       h('div', { class: 'eyebrow' }, '몸 동작 · 감정'), elementsBlock(sd, castList, sdDirty, ['body', 'emotion'], '동작 · 감정 추가'),
       h('div', { class: 'row', style: 'gap:8px;align-items:center' }, h('button', { class: 'btn sm', type: 'button', 'data-sb-save-struct': sc.id, onclick: () => saveAll() }, '이미지 설정 저장'), structNote))),
     panel(ep, sc, 'face', '얼굴 표정 (선택)', '눈 · 눈썹 · 입', elementsBlock(sd, castList, sdDirty, ['eyes', 'eyebrows', 'mouth', 'face'], '얼굴 세부 추가')),
-    panel(ep, sc, 'camera', '카메라 · 샷 (선택)', '추천 샷', h('div', { class: 'stack', style: 'gap:8px' }, h('div', { class: 'small muted' }, '추천 샷을 누르면 카메라 지시로 들어갑니다 (한 번 더 누르면 해제).'), shotChips(sd, sdDirty, redrawCamera), elementsBlock(sd, castList, sdDirty, ['camera'], '카메라 지시 추가'))),
-    panel(ep, sc, 'charrefs', '참조 이미지 (캐릭터 · 제품)', charRefsBadge(sc) + ' · 제품 ' + (d.showsProduct ? 'ON' : 'OFF'), h('div', { class: 'stack', style: 'gap:10px' }, charRefsPanelBody(ep, sc), h('div', { class: 'eyebrow' }, '제품'), toggle, placeBox)),
+    panel(ep, sc, 'camera', '카메라 · 샷 · 무빙 (선택)', '추천 샷 · 무빙', h('div', { class: 'stack', style: 'gap:8px' }, h('div', { class: 'small muted' }, '추천 샷을 누르면 카메라 지시로 들어갑니다 (한 번 더 누르면 해제).'), shotChips(sd, sdDirty, redrawCamera), h('div', { class: 'small muted' }, '카메라 무빙은 영상에서 카메라가 어떻게 움직일지 정합니다 (고정이 기본값, 한 번 더 누르면 해제). 시작 이미지 한 장에는 영향을 주지 않고 애니메이션 프롬프트에 들어갑니다.'), moveChips(sd, sdDirty, redrawCamera), elementsBlock(sd, castList, sdDirty, ['camera'], '카메라 지시 추가'))),
+    panel(ep, sc, 'charrefs', '참조 이미지 (캐릭터 · 제품)', charRefsBadge(sc) + ' · 제품 ' + (d.showsProduct ? 'ON' : 'OFF') + (sd.sceneRefs.length ? ' · 씬 ' + sd.sceneRefs.length : ''), h('div', { class: 'stack', style: 'gap:10px' }, charRefsPanelBody(ep, sc), sceneRefsBox, h('div', { class: 'eyebrow' }, '제품'), toggle, placeBox)),
     panel(ep, sc, 'imageprompt', '이미지 프롬프트 (자동 합성 · 직접 수정 가능)', sc.imagePrompt && sc.imagePrompt.edited ? '수정됨' : '자동', imagePromptBody(ep, sc)),
   ];
   const summaryRow = h('div', { class: 'row', style: 'gap:10px;align-items:center;flex-wrap:wrap;border-left:4px solid var(--sage);padding-left:10px', 'data-sb-approved-summary': sc.id },
