@@ -76,7 +76,7 @@ function episodeCard(e, { archivedView = false } = {}) {
       h('div', { class: 'row between' }, h('span', { class: 'eyebrow' }, e.id), h('div', { class: 'row', style: 'gap:6px' }, archivedView ? chip('보관됨', 'mock') : null, e.onHold ? chip('보류 중', 'mock') : null, chip(status[0], status[1]))),
       h('h3', { style: 'font-size:17px' }, e.title),
       h('div', { class: 'small muted' }, e.productName),
-      e.concept && e.concept.linked ? h('div', { class: 'small' }, chip(e.concept.ok ? '컨셉 ' + e.concept.conceptId + ' r' + e.concept.revision : e.concept.state === 'script_stale' ? '컨셉 변경 · 대본 재생성 필요' : '컨셉 승인 필요', e.concept.ok ? 'done' : 'attention')) : e.concept && e.concept.legacy ? h('div', { class: 'small' }, chip('스토리 랩 이전', 'mock')) : null,
+      e.concept && e.concept.linked ? h('div', { class: 'small' }, chip(e.concept.ok ? '컨셉 ' + e.concept.conceptId + ' r' + e.concept.revision : e.concept.canProceed ? '컨셉 변경 · 기존 대본으로 진행 가능' : '컨셉 승인 필요', e.concept.ok ? 'done' : 'attention')) : e.concept && e.concept.legacy ? h('div', { class: 'small' }, chip('스토리 랩 이전', 'mock')) : null,
       h('div', { class: 'mini-dots' }, e.steps.map((st) => h('i', { class: st.state, title: st.label }))),
       h('div', { class: 'small muted' }, `${e.scenes}장면 · 약 ${Math.round(e.totalPlannedSec)}초 · 지출 ${fmtUsd(e.spentUsd)}`),
       h('div', { class: 'row', style: 'flex-wrap:nowrap' }, h('button', { class: 'btn sm', 'data-open-episode': e.id, onclick: async () => { await selectEpisode(e.id); go('script'); } }, '열기'), h('span', { style: 'margin-left:auto' }, episodeMenu(e, { archivedView })))));

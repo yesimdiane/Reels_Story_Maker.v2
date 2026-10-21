@@ -121,11 +121,13 @@ test('changing an approved concept requires re-approval and flags the script for
   const cs = s.episodeView(epId).derived.concept;
   assert.equal(cs.regenerationRequired, true);
   assert.equal(cs.ok, false);
-  await assert.rejects(approveWithScenes(s, epId), (e) => e.code === 'CONCEPT_NOT_APPROVED');
-  await assert.rejects(s.scriptgen.generate(epId, { confirm: CONFIRM, overwrite: true }), (e) => e.code === 'CONCEPT_NOT_APPROVED');
+  assert.equal(cs.canProceed, true, 'the episode already has its script: a Story Lab edit never blocks it');
+  await approveWithScenes(s, epId); // the existing script can still be approved and move on
+  assert.equal(s.episodeView(epId).derived.scriptApproved, true);
+  await assert.rejects(s.scriptgen.generate(epId, { confirm: CONFIRM, overwrite: true }), (e) => e.code === 'CONCEPT_NOT_APPROVED'); // a NEW script still needs an approved concept
   await s.storylab.approve(pid, c.id);
   assert.equal(s.episodeView(epId).derived.concept.regenerationRequired, true, 'still stale until the script is regenerated');
-  await assert.rejects(approveWithScenes(s, epId), (e) => e.code === 'CONCEPT_NOT_APPROVED');
+  await approveWithScenes(s, epId);
   await s.scriptgen.generate(epId, { confirm: CONFIRM, overwrite: true });
   assert.equal(s.episodeView(epId).derived.concept.ok, true);
   await approveWithScenes(s, epId);
@@ -174,4 +176,24 @@ test('legacy migration: EP01 gets a product record, keeps IDs/approvals, is idem
   assert.equal(v.derived.steps.find((x) => x.key === 'concept').state, 'done');
   await approveWithScenes(s, 'EP01'); // legacy approval path still works
   assert.equal(s.episodeView('EP01').derived.scriptApproved, true);
+});
+
+test('a Story Lab edit never locks an existing episode: after the script changes it can be approved again and the pipeline stays open', async () => {
+  const ai = paidAi(() => goodConcepts(3));
+  const { s } = make({ ai });
+  const pid = await readyProduct(s);
+  routePaid(s);
+  const c = (await s.storylab.generate(pid, { category: 'all', confirm: CONFIRM })).concepts[0];
+  await s.storylab.approve(pid, c.id);
+  const epId = await s.createEpisodeFromConcept({ productId: pid, conceptId: c.id });
+  await s.scriptgen.generate(epId, { confirm: CONFIRM });
+  await s.storylab.edit(pid, c.id, { storyline: '완전히 다른 결말로 끝나는 새로운 이야기입니다. 처음의 궁금증은 마지막에 풀립니다.' }); // concept now needs re-approval, NOT re-approved
+  const sceneId = s.store.episodes.get(epId).scenes[0].id;
+  await s.store.episodes.update(epId, (ep) => { ep.scenes.find((x) => x.id === sceneId).visual = ep.scenes.find((x) => x.id === sceneId).visual + ' (edited)'; });
+  const steps = () => Object.fromEntries(s.episodeView(epId).derived.steps.map((x) => [x.key, x.state]));
+  assert.notEqual(steps().script, 'blocked', 'the script step is not locked by the concept edit');
+  await approveWithScenes(s, epId);
+  assert.equal(s.episodeView(epId).derived.scriptApproved, true, 'approved although the concept was edited');
+  assert.notEqual(steps().storyboard, 'blocked', 'the storyboard / image step is reachable');
+  assert.equal(s.episodeView(epId).derived.concept.canProceed, true);
 });
