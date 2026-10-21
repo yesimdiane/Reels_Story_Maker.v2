@@ -278,6 +278,19 @@ function createProductAnalysis({ products, router, log = () => {} }) {
     return view(pid);
   }
 
+  /** 승인 취소: the version goes back to a draft (its text is kept); nothing downstream is deleted, new image requests simply stop using it. */
+  async function revoke(pid, v, by = 'operator') {
+    await products.mutate(pid, (p) => {
+      const a = (p.analyses || []).find((x) => x.v === Number(v));
+      if (!a) throw new StudioError('NOT_FOUND', `분석 v${v}을(를) 찾을 수 없습니다.`, { status: 404 });
+      if (a.status !== 'approved') return;
+      a.status = 'draft'; a.revokedAt = nowIso(); a.revokedBy = by; delete a.approvedTextSha; a.updatedAt = nowIso();
+      if (p.analysisApprovedV === a.v) p.analysisApprovedV = undefined;
+    });
+    log('product.analysis.revoked', { productId: pid, v: Number(v) });
+    return view(pid);
+  }
+
   /**
    * What a scene image request gets: the approved description as prompt text — ONLY together with the actual attached product images.
    * Returns { block, record, warnings }. Never writes anything (the caller registers the image set when it really generates).
@@ -349,7 +362,7 @@ function createProductAnalysis({ products, router, log = () => {} }) {
     return Object.assign(view(pid), { developedV: nv });
   }
 
-  return { view, estimate, generate, edit, approve, develop, developEstimate, contextFor, registerImageSet, peekSetVersion, selectImages, SYSTEM, SECTIONS, FIXED_NEGATIVES, SAMPLE_MARK, MAX_ANALYSIS_IMAGES };
+  return { view, estimate, generate, edit, approve, revoke, develop, developEstimate, contextFor, registerImageSet, peekSetVersion, selectImages, SYSTEM, SECTIONS, FIXED_NEGATIVES, SAMPLE_MARK, MAX_ANALYSIS_IMAGES };
 }
 
 module.exports = { createProductAnalysis, SAMPLE_MARK, FIXED_NEGATIVES, verifiedBehavior };

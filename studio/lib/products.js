@@ -436,6 +436,12 @@ function createProductService({ store, router, extractFn = extractProduct, downl
     return view(p);
   }
 
+  /** 승인 취소: the reference-set approval (or the "continue without images" record) is removed; images and their own approvals stay. */
+  async function revokeReferenceSet(id) {
+    const p = await update(id, (p) => { p.referenceSet = null; });
+    return view(p);
+  }
+
   async function waiveReferences(id, reason, by = 'operator') {
     if (!String(reason || '').trim()) throw new StudioError('NEED_REASON', '이미지 없이 진행하는 이유를 입력하세요.', { status: 400 });
     const p = await update(id, (p) => { p.referenceSet = { id: 'refset_waived', waived: String(reason).slice(0, 300), imageIds: [], hash: '', by, at: nowIso() }; });
@@ -563,7 +569,7 @@ function createProductService({ store, router, extractFn = extractProduct, downl
     return path.join(dirOf(id), im.file);
   }
 
-  return { approveUploadedImages, uploadReview, saveReviews, reviewsEstimate, analyzeReviews, approveReviews, reviewMediaFile, list, get: (id) => view(get(id)), raw: get, mutate: update, create, edit, extract, upload, replace, removeImage, reorderImages, setPrimary, setStatus, generateImage, chooseVersion, imageCount, approveReferenceSet, waiveReferences, bindingFor, imageFiles, mediaFile, lockCodeSync, suggestCode, referenceState, verifiedFacts, readiness, MAX_UPLOADS, MIN_SIDE, MAX_SIDE };
+  return { approveUploadedImages, uploadReview, saveReviews, reviewsEstimate, analyzeReviews, approveReviews, reviewMediaFile, list, get: (id) => view(get(id)), raw: get, mutate: update, create, edit, extract, upload, replace, removeImage, reorderImages, setPrimary, setStatus, generateImage, chooseVersion, imageCount, approveReferenceSet, revokeReferenceSet, waiveReferences, bindingFor, imageFiles, mediaFile, lockCodeSync, suggestCode, referenceState, verifiedFacts, readiness, MAX_UPLOADS, MIN_SIDE, MAX_SIDE };
 }
 
 module.exports = { createProductService, KIND_LABEL, MAX_UPLOADS, MIN_SIDE, MAX_SIDE };

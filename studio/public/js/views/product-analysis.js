@@ -1,7 +1,7 @@
 // Product Studio → 제품 구조 설명 (AI 시각 분석): a vision AI reads the product reference images and drafts an English
 // PRODUCT STRUCTURE DESCRIPTION. The operator reviews / corrects it and approves it. The approved text is attached, together with the
 // actual reference images, to every scene image that shows the product. Nothing here bills without the cost confirmation.
-import { h, chip, toast } from '../ui.js';
+import { h, chip, toast, confirmDialog } from '../ui.js';
 import { state, act } from '../state.js';
 import { api } from '../api.js';
 import { asyncBlock, confirmPaid, busyButton } from './common.js';
@@ -74,6 +74,12 @@ function draw(p, a, ui, rerender) {
     await rerender();
   } }, approvedHere || shown.status !== 'draft' ? '수정본을 새 버전으로 저장' : '수정 저장');
   const dirty = () => { save.disabled = ta.value === shown.text; };
+  const revoke = approvedHere ? h('button', { class: 'btn ghost', type: 'button', 'data-analysis-revoke': shown.v, title: '승인만 취소합니다 (설명 내용은 그대로 초안으로 남습니다)', onclick: async () => {
+    if (!(await confirmDialog({ title: `구조 설명 v${shown.v} 승인을 취소할까요?`, body: '설명 내용은 지워지지 않고 초안으로 돌아갑니다. 취소하면 새 이미지 요청에 이 설명이 자동으로 들어가지 않습니다 (이미 만든 이미지는 그대로입니다).', confirm: '승인 취소', tone: 'clay' }))) return;
+    try { await api.post(`/api/products/${p.id}/analysis/${shown.v}/revoke`); toast(`구조 설명 v${shown.v} 승인을 취소했습니다.`); ui.open = true; ui.text = null; }
+    catch (e) { toast(e.message, { error: true, recovery: e.recovery }); }
+    await rerender();
+  } }, '승인 취소') : null;
   const approve = h('button', { class: 'btn sage', type: 'button', 'data-analysis-approve': shown.v, disabled: approvedHere, onclick: async () => {
     ui.open = true;
     if (ta.value !== shown.text) return toast('먼저 수정 내용을 저장한 뒤 승인하세요.', { error: true });
@@ -88,7 +94,7 @@ function draw(p, a, ui, rerender) {
     !shown.intact ? h('div', { class: 'banner warn' }, h('div', null, `이 분석(v${shown.v})을 만든 뒤 제품 이미지가 바뀌었습니다. 새로 분석한 뒤 승인하세요.`)) : null,
     h('div', { class: 'small muted' }, '[VERIFIED] = 사진에서 분명히 보이는 것 · [UNCERTAIN] = 추정이거나 일부만 보이는 것(사실로 취급하지 않음). AI가 틀릴 수 있으니 제품 사진과 비교해 고쳐 주세요. 치수·소재·숨은 기능을 지어내지 마세요.'),
     ta,
-    h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' }, save, approve),
+    h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' }, save, approve, revoke),
     approvedHere ? h('div', { class: 'small', style: 'color:var(--sage-deep)' }, '이 승인본은 스토리보드 이미지(제품이 나오는 장면)를 만들 때 제품 참조 이미지와 함께 영어 프롬프트에 자동으로 들어갑니다. 이미 승인된 장면 이미지는 자동으로 다시 만들어지지 않습니다.') : null));
   return wrap;
 }

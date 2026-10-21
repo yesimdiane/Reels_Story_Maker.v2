@@ -1,4 +1,4 @@
-import { h, chip, icon, copyText, toast } from '../ui.js';
+import { h, chip, icon, copyText, toast, confirmDialog } from '../ui.js';
 import { state, act, requireEpisode } from '../state.js';
 import { api } from '../api.js';
 import { pageHead, pipelineBar, noEpisode, episodePicker, issueList, lockedNotice } from './common.js';
@@ -57,12 +57,20 @@ export function publishing() {
   const approved = !!pub.approvedAt;
   side.append(h('div', { class: 'card' }, h('h3', null, '승인'),
     approved ? h('p', { class: 'small' }, chip('캡션 승인됨', 'done')) : h('p', { class: 'small muted' }, '승인 후 내용을 고치면 다시 승인해야 합니다.'),
-    h('button', { class: 'btn sage', disabled: approved || dirty || !ep.approvals.final || (v && !v.ok), onclick: () => act(() => api.post(`/api/episodes/${ep.id}/publishing/approve`), { ok: '캡션·DM 문구를 승인했습니다' }) }, icon('check'), approved ? '승인 완료' : '캡션·DM 승인')));
+    h('button', { class: 'btn sage', disabled: approved || dirty || !ep.approvals.final || (v && !v.ok), onclick: () => act(() => api.post(`/api/episodes/${ep.id}/publishing/approve`), { ok: '캡션·DM 문구를 승인했습니다' }) }, icon('check'), approved ? '승인 완료' : '캡션·DM 승인'),
+    approved ? h('button', { class: 'btn ghost', style: 'margin-left:8px', 'data-publishing-revoke': ep.id, title: '승인만 취소합니다 (문구는 그대로 남습니다)', onclick: async () => {
+      if (!(await confirmDialog({ title: '캡션·DM 승인을 취소할까요?', body: '문구는 지워지지 않습니다. 취소하면 다시 승인해야 게시 준비가 완료됩니다.', confirm: '승인 취소', tone: 'clay' }))) return;
+      await act(() => api.post(`/api/episodes/${ep.id}/publishing/revoke`), { ok: '캡션·DM 승인을 취소했습니다' });
+    } }, '승인 취소') : null));
 
   const urlIn = h('input', { type: 'url', placeholder: 'https://www.instagram.com/reel/…', value: pub.postUrl || '', disabled: !!pub.publishedAt });
   side.append(h('div', { class: 'card' }, h('h3', null, '게시 완료 기록'),
     pub.publishedAt ? h('p', { class: 'small' }, chip('게시됨', 'done'), ' ', h('a', { href: pub.postUrl, target: '_blank', rel: 'noopener' }, pub.postUrl)) : h('p', { class: 'small muted' }, '인스타그램에 직접 올린 뒤 게시물 주소를 기록합니다. 체크리스트가 모두 완료되어야 합니다.'),
-    h('div', { class: 'row', style: 'flex-wrap:nowrap' }, urlIn, h('button', { class: 'btn', disabled: !chk.ready || !!pub.publishedAt, onclick: () => act(() => api.post(`/api/episodes/${ep.id}/publishing/published`, { postUrl: urlIn.value }), { ok: '게시 완료로 기록했습니다' }) }, '기록'))));
+    h('div', { class: 'row', style: 'flex-wrap:nowrap' }, urlIn, h('button', { class: 'btn', disabled: !chk.ready || !!pub.publishedAt, onclick: () => act(() => api.post(`/api/episodes/${ep.id}/publishing/published`, { postUrl: urlIn.value }), { ok: '게시 완료로 기록했습니다' }) }, '기록')),
+    pub.publishedAt ? h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'btn ghost', 'data-publishing-clear': ep.id, title: '게시했다는 기록만 지웁니다 (인스타그램의 게시물은 건드리지 않습니다)', onclick: async () => {
+      if (!(await confirmDialog({ title: '게시 완료 기록을 취소할까요?', body: '이 스튜디오의 기록만 지웁니다. 인스타그램에 올린 게시물은 그대로입니다.', confirm: '기록 취소', tone: 'clay' }))) return;
+      await act(() => api.post(`/api/episodes/${ep.id}/publishing/clear-published`), { ok: '게시 완료 기록을 취소했습니다' });
+    } }, '게시 기록 취소')) : null));
   wrap.append(h('div', { class: 'split wide-left' }, form, side));
   return wrap;
 }

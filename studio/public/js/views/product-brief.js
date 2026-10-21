@@ -1,7 +1,7 @@
 // Product Studio → "AI 분석 결과 보기": one popup to read the approved / latest structure description, correct it, approve it,
 // or let the AI revise it from the operator's feedback ("AI 발전"). Edit and approve reuse /api/products/:id/analysis/:v; develop is paid
 // and always goes through the cost confirmation. The approved version is never overwritten (edits and AI revisions become new drafts).
-import { h, chip, toast, modal } from '../ui.js';
+import { h, chip, toast, modal, confirmDialog } from '../ui.js';
 import { api } from '../api.js';
 import { confirmPaid } from './common.js';
 
@@ -33,6 +33,11 @@ function show(p, a, onChanged, wantV) {
       try { await api.post(`/api/products/${p.id}/analysis/${shown.v}/approve`); close(); toast(`v${shown.v}을 승인했습니다. 스토리 랩과 장면 이미지에 사용됩니다.`); await reopen(shown.v); }
       catch (e) { toast(e.message, { error: true, recovery: e.recovery }); }
     } }, shown.status === 'approved' ? '승인됨' : `v${shown.v} 최종 승인`);
+    const revoke = shown.status === 'approved' ? h('button', { class: 'btn sm ghost', type: 'button', 'data-brief-revoke': shown.v, title: '승인만 취소합니다 (설명 내용은 초안으로 남습니다)', onclick: async () => {
+      if (!(await confirmDialog({ title: `v${shown.v} 승인을 취소할까요?`, body: '설명 내용은 지워지지 않고 초안으로 돌아갑니다. 새 이미지 요청에는 더 이상 자동으로 들어가지 않습니다.', confirm: '승인 취소', tone: 'clay' }))) return;
+      try { await api.post(`/api/products/${p.id}/analysis/${shown.v}/revoke`); close(); toast(`v${shown.v} 승인을 취소했습니다.`); await reopen(shown.v); }
+      catch (e) { toast(e.message, { error: true, recovery: e.recovery }); }
+    } }, '승인 취소') : null;
     const develop = h('button', { class: 'btn clay', type: 'button', 'data-brief-develop': '', onclick: async (e) => {
       const feedback = fb.value.trim();
       if (!feedback) return toast('AI에게 요청할 수정 내용을 입력하세요.', { error: true });
@@ -55,7 +60,7 @@ function show(p, a, onChanged, wantV) {
         shown.sample ? chip('샘플 · 실제 분석 아님', 'mock') : null,
         a.versions.length > 1 ? h('span', { class: 'row', style: 'gap:4px' }, a.versions.map((v) => h('button', { type: 'button', class: 'btn sm ' + (v.v === shown.v ? '' : 'ghost'), onclick: () => { close(); show(p, a, onChanged, v.v); } }, 'v' + v.v))) : null),
       ta,
-      h('div', { class: 'row end', style: 'gap:8px' }, save, approve),
+      h('div', { class: 'row end', style: 'gap:8px' }, save, approve, revoke),
       h('div', { class: 'develop-box stack', style: 'gap:8px' }, h('b', { class: 'small' }, 'AI 발전 — 확인된 사실은 그대로 두고 표현·아이디어만 고칩니다 (유료, 비용 확인 후 실행)'), fb, h('div', { class: 'row end' }, develop)));
   }, { wide: true });
 }
