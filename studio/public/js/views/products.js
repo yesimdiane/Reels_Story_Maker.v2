@@ -222,10 +222,16 @@ function draw(p) {
       h('p', null, rr.analysis.summary || ''),
       ...[['pros','장점'],['cons','단점'],['purchaseMotivations','구매 동기'],['comicSituations','릴스 코미디 아이디어'],['cautions','주의사항']].map(([key,label]) =>
         h('div', { class: 'stack', style: 'gap:3px' }, h('b', null, label), h('p', { class: 'small', style: 'white-space:pre-wrap;margin:0' }, (rr.analysis[key] || []).map((x) => '• ' + x).join('\n') || '없음'))),
-      h('button', { class: 'btn sage', disabled: !!rr.approved, onclick: async () => {
-        try { await api.post('/api/products/' + p.id + '/reviews/approve', { approved: true }); toast('리뷰 분석이 승인되었습니다.'); await act(async () => null); }
-        catch (err) { toast(err.message, { error: true }); }
-      } }, rr.approved ? '승인됨' : '내용 확인 후 승인')) : null);
+      h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' },
+        h('button', { class: 'btn sage', disabled: !!rr.approved, onclick: async () => {
+          try { await api.post('/api/products/' + p.id + '/reviews/approve', { approved: true }); toast('리뷰 분석이 승인되었습니다.'); await act(async () => null); }
+          catch (err) { toast(err.message, { error: true }); }
+        } }, rr.approved ? '승인됨' : '내용 확인 후 승인'),
+        rr.approved ? h('button', { class: 'btn ghost', 'data-review-revoke': p.id, title: '승인만 취소합니다 (분석 내용은 그대로 남습니다)', onclick: async () => {
+          if (!(await confirmDialog({ title: '리뷰 분석 승인을 취소할까요?', body: '분석 내용은 지워지지 않습니다. 취소하면 스토리 랩에 반영되지 않습니다.', confirm: '승인 취소', tone: 'clay' }))) return;
+          try { await api.post('/api/products/' + p.id + '/reviews/approve', { approved: false }); toast('리뷰 분석 승인을 취소했습니다.'); await act(async () => null); }
+          catch (err) { toast(err.message, { error: true }); }
+        } }, '승인 취소') : null)) : null);
 
   // ---- B. images ----
   const dz = imageIntake({ product: p, run, rerender: () => act(async () => null) });
@@ -311,7 +317,11 @@ function draw(p) {
     p.readiness.ok ? h('div', { class: 'banner ok' }, '스토리 랩에서 사용할 준비가 되었습니다.') : h('div', { class: 'banner warn' }, h('div', null, '필요: ' + p.readiness.missing.join(', '))),
     h('div', { class: 'row' },
       h('button', { class: 'btn sage', disabled: !approvedIds.length, onclick: () => run(() => api.post(`/api/products/${p.id}/references/approve`, { imageIds: approvedIds }), '참조 이미지 세트를 승인했습니다') }, icon('check'), `승인된 이미지 ${approvedIds.length}장을 참조 세트로 승인`),
-      h('button', { class: 'btn ghost', onclick: waive }, '이미지 없이 진행…'))));
+      h('button', { class: 'btn ghost', onclick: waive }, '이미지 없이 진행…'),
+      r.state === 'approved' || r.state === 'waived' ? h('button', { class: 'btn ghost', 'data-reference-revoke': p.id, title: '참조 세트 승인(또는 "이미지 없이 진행" 기록)만 취소합니다. 이미지와 각 이미지의 승인은 그대로입니다.', onclick: async () => {
+        if (!(await confirmDialog({ title: r.state === 'waived' ? '"이미지 없이 진행" 기록을 취소할까요?' : '참조 이미지 세트 승인을 취소할까요?', body: '이미지와 각 이미지의 승인은 그대로 남습니다. 취소하면 스토리 랩은 참조 세트를 다시 승인할 때까지 사용할 수 없습니다.', confirm: '승인 취소', tone: 'clay' }))) return;
+        await run(() => api.post(`/api/products/${p.id}/references/revoke`), '승인을 취소했습니다');
+      } }, '승인 취소') : null)));
   async function waive() {
     const reason = prompt('이미지 없이 진행하는 이유를 적으세요 (기록됩니다)');
     if (reason) await run(() => api.post(`/api/products/${p.id}/references/waive`, { reason }), '기록했습니다');

@@ -47,47 +47,72 @@ export function storyboard() {
   const selection = uiState();
   selection.sbImageBatch = selection.sbImageBatch || {};
   const existing = selection.sbImageBatch[ep.id];
-  const eligible = ep.scenes.filter((s) => !(s.startImageInfo && s.startImageInfo.approved));
-  const selected = new Set(Array.isArray(existing) ? existing.filter((id) => eligible.some((s) => s.id === id)) : eligible.map((s) => s.id));
+  const isApproved = (s) => !!(s.startImageInfo && s.startImageInfo.approved);
+  const hasFrame = (s) => !!(s.startImageInfo && s.startImageInfo.url && !s.startImageInfo.error);
+  const eligible = ep.scenes.filter((s) => !isApproved(s));
+  const known = new Set(ep.scenes.map((s) => s.id));
+  const selected = new Set(Array.isArray(existing) ? existing.filter((id) => known.has(id)) : eligible.map((s) => s.id));
   selection.sbImageForce = selection.sbImageForce || {};
   let regenerateExisting = !!selection.sbImageForce[ep.id];
+  const byId = (id) => ep.scenes.find((s) => s.id === id);
+  // what each action may touch: images are only requested for cuts that are not approved yet (approved ones stay protected);
+  // approving needs an image; cancelling needs an approved image
+  const toRequest = () => [...selected].filter((id) => !isApproved(byId(id)));
+  const toApprove = () => [...selected].filter((id) => { const s = byId(id); return !isApproved(s) && hasFrame(s); });
+  const toRevoke = () => [...selected].filter((id) => isApproved(byId(id)));
+  const rerenderNow = () => import('../state.js').then(({ hooks }) => hooks.rerender());
+  const save = () => { selection.sbImageBatch[ep.id] = [...selected]; };
   const batchButton = h('button', { class: 'btn clay', type: 'button', 'data-sb-generate-selected': ep.id,
-    disabled: !ep.derived.scriptApproved || selected.size === 0,
     onclick: async () => {
-      if (!selected.size) return;
-      await makeStartImages(ep, [...selected], { force: regenerateExisting, after: refresh });
-    } }, '선택한 컷 이미지 요청 (' + selected.size + ')');
+      const ids = toRequest();
+      if (!ids.length) return;
+      await makeStartImages(ep, ids, { force: regenerateExisting, after: refresh });
+    } });
+  const approveSelected = h('button', { class: 'btn sage', type: 'button', 'data-sb-approve-selected': ep.id,
+    title: '이미지가 있는 미승인 컷만 승인합니다',
+    onclick: async () => {
+      const ids = toApprove();
+      if (!ids.length) return;
+      await act(async () => { let r = null; for (const id of ids) r = await api.post(`/api/episodes/${ep.id}/scenes/${id}/start-frame/approve`, { approved: true }); return r; }, { ok: `${ids.length}개 컷 이미지를 승인했습니다` });
+    } });
+  const revokeSelected = h('button', { class: 'btn ghost', type: 'button', 'data-sb-revoke-selected': ep.id,
+    title: '승인된 컷만 승인을 취소합니다 (이미지는 지워지지 않습니다)',
+    onclick: async () => {
+      const ids = toRevoke();
+      if (!ids.length) return;
+      if (!(await confirmDialog({ title: `${ids.length}개 컷의 이미지 승인을 취소할까요?`, body: '이미지는 지워지지 않습니다. 취소하면 해당 컷의 영상 생성은 다시 이미지 승인을 기다리고, 스토리보드 승인도 다시 필요합니다.', confirm: '승인 취소', tone: 'clay' }))) return;
+      await act(async () => { let r = null; for (const id of ids) r = await api.post(`/api/episodes/${ep.id}/scenes/${id}/start-frame/approve`, { approved: false }); return r; }, { ok: `${ids.length}개 컷의 이미지 승인을 취소했습니다` });
+    } });
+  const syncButtons = () => {
+    batchButton.textContent = '선택한 컷 이미지 요청 (' + toRequest().length + ')';
+    batchButton.disabled = !ep.derived.scriptApproved || toRequest().length === 0;
+    approveSelected.textContent = '선택한 컷 승인 (' + toApprove().length + ')';
+    approveSelected.disabled = toApprove().length === 0;
+    revokeSelected.textContent = '선택한 컷 승인 취소 (' + toRevoke().length + ')';
+    revokeSelected.disabled = toRevoke().length === 0;
+  };
+  syncButtons();
   const selectionList = h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap', 'data-sb-image-selection': ep.id },
-    ep.scenes.map((s) => {
-      const approved = !!(s.startImageInfo && s.startImageInfo.approved);
-      return h('label', { class: 'small row', style: 'gap:4px;cursor:pointer' },
-        h('input', { type: 'checkbox', checked: selected.has(s.id), disabled: approved,
-          'data-sb-select-cut': s.id, onchange: (e) => {
-            if (e.target.checked) selected.add(s.id); else selected.delete(s.id);
-            selection.sbImageBatch[ep.id] = [...selected];
-            batchButton.textContent = '선택한 컷 이미지 요청 (' + selected.size + ')';
-            batchButton.disabled = !ep.derived.scriptApproved || selected.size === 0;
-          } }), s.id + (approved ? ' · 승인됨' : ''));
-    }));
+    ep.scenes.map((s) => h('label', { class: 'small row', style: 'gap:4px;cursor:pointer' },
+      h('input', { type: 'checkbox', checked: selected.has(s.id),
+        'data-sb-select-cut': s.id, onchange: (e) => { if (e.target.checked) selected.add(s.id); else selected.delete(s.id); save(); syncButtons(); } }),
+      s.id + (isApproved(s) ? ' · 승인됨' : ''))));
+  const pick = (ids) => { selected.clear(); ids.forEach((id) => selected.add(id)); save(); rerenderNow(); };
   wrap.append(h('section', { class: 'card stack', style: 'gap:10px', 'data-sb-image-batch': ep.id },
-    h('div', { class: 'row between', style: 'gap:10px;flex-wrap:wrap' },
-      h('div', null, h('b', null, '컷별 이미지 일괄 요청'),
-        h('div', { class: 'small muted' }, '컷 구성을 저장한 후 요청하세요. 승인된 이미지는 보호됩니다. 기존 미승인 이미지도 재생성 옵션으로 새 버전을 만들 수 있습니다.')),
-      batchButton),
+    h('div', null, h('b', null, '컷별 이미지 일괄 처리'),
+      h('div', { class: 'small muted' }, '컷을 고른 뒤 이미지 요청 · 승인 · 승인 취소를 한꺼번에 할 수 있습니다. 컷 구성을 저장한 후 요청하세요. 승인된 이미지는 이미지 요청에서 보호됩니다.')),
+    h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' }, batchButton, approveSelected, revokeSelected),
     selectionList,
     h('label', { class: 'small row', style: 'gap:8px;align-items:center;cursor:pointer' },
       h('input', { type: 'checkbox', 'data-sb-force-existing': ep.id, checked: regenerateExisting, onchange: (e) => { regenerateExisting = e.target.checked; selection.sbImageForce[ep.id] = regenerateExisting; } }),
       '기존 미승인 이미지도 다시 생성 (추가 비용 발생 가능)'),
     h('div', { class: 'small muted' }, '기존 이미지를 건너뛰지 않고 새 이미지를 요청합니다. 실제 생성은 예상 비용 및 명시적 결제 승인 후 시작하며, 승인된 이미지는 덮어쓰지 않습니다.'),
-    h('div', { class: 'row', style: 'gap:8px' },
-      h('button', { class: 'btn sm ghost', type: 'button', onclick: () => {
-        selected.clear(); eligible.forEach((s) => selected.add(s.id));
-        selection.sbImageBatch[ep.id] = [...selected]; import('../state.js').then(({ hooks }) => hooks.rerender());
-      } }, '미승인 컷 전체 선택'),
-      h('button', { class: 'btn sm ghost', type: 'button', onclick: () => {
-        selected.clear(); selection.sbImageBatch[ep.id] = []; import('../state.js').then(({ hooks }) => hooks.rerender());
-      } }, '선택 해제')),
-    h('div', { class: 'small muted' }, '클릭하면 먼저 예상 비용을 확인합니다. 비용 승인 전에는 AI 이미지 생성 요청을 보내지 않습니다.')));
+    h('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap' },
+      h('button', { class: 'btn sm ghost', type: 'button', 'data-sb-pick-unapproved': '', onclick: () => pick(eligible.map((s) => s.id)) }, '미승인 컷 전체 선택'),
+      h('button', { class: 'btn sm ghost', type: 'button', 'data-sb-pick-approved': '', onclick: () => pick(ep.scenes.filter(isApproved).map((s) => s.id)) }, '승인된 컷 전체 선택'),
+      h('button', { class: 'btn sm ghost', type: 'button', 'data-sb-pick-all': '', onclick: () => pick(ep.scenes.map((s) => s.id)) }, '전체 선택'),
+      h('button', { class: 'btn sm ghost', type: 'button', 'data-sb-pick-none': '', onclick: () => pick([]) }, '선택 해제')),
+    h('div', { class: 'small muted' }, '이미지 요청은 먼저 예상 비용을 확인합니다. 비용 승인 전에는 AI 이미지 생성 요청을 보내지 않습니다.')));
   wrap.append(sceneGallery(ep, (sid) => { setIndex(ep, ep.scenes.findIndex((x) => x.id === sid)); import('../state.js').then(({ hooks }) => hooks.rerender()); window.scrollTo({ top: 0, behavior: 'smooth' }); }));
   wrap.append(h('div', { class: 'scene-tabs', role: 'tablist', 'aria-label': '장면 목록' }, ep.scenes.map((s, k) => {
     const img = s.startImageInfo;
@@ -265,9 +290,11 @@ function sceneCard(ep, sc, i, chars, go) {
     h('div', { class: 'scene-actions-bar inline sb-actions' }, h('div', { class: 'bar-buttons' }, saveBtn, nextBtn)),
     ...shownPanels);
   // mobile: the same actions as a sticky bar (the inline copy is hidden by CSS on phones)
-  const bar = h('div', { class: 'scene-actions-bar sb-bar' }, h('div', { class: 'bar-buttons' }, saveBtn.cloneNode(true), approveBtn.cloneNode(true), nextBtn.cloneNode(true)));
+  // once the image is approved the same slot becomes "승인 취소" (never a dead, greyed-out approve button)
+  const mainBtn = revokeImgBtn || approveBtn;
+  const bar = h('div', { class: 'scene-actions-bar sb-bar' }, h('div', { class: 'bar-buttons' }, saveBtn.cloneNode(true), mainBtn.cloneNode(true), nextBtn.cloneNode(true)));
   bar.querySelector('[data-sb-save]').addEventListener('click', () => saveAll());
-  bar.querySelector('[data-sb-approve-image]').addEventListener('click', () => approveBtn.click());
+  bar.querySelector(revokeImgBtn ? '[data-sb-revoke-image]' : '[data-sb-approve-image]').addEventListener('click', () => mainBtn.click());
   bar.querySelector('[data-sb-next]').addEventListener('click', () => nextBtn.click());
   return { el, bar };
 }

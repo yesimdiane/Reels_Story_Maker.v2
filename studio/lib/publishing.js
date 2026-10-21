@@ -117,6 +117,28 @@ function createPublishingService({ store }) {
     store.episodes.audit(epId, 'publishing.approved', { by });
   }
 
+  /** 승인 취소: the caption / DM approval is removed (the text stays); not possible once the post is recorded as published — clear that record first. */
+  async function revoke(epId, by = 'operator') {
+    await store.episodes.update(epId, (ep) => {
+      if (!ep.publishing || !ep.publishing.approvedAt) return;
+      if (ep.publishing.publishedAt) throw new StudioError('ALREADY_PUBLISHED', '게시 완료로 기록된 뒤에는 승인을 취소할 수 없습니다. 먼저 게시 기록을 취소하세요.', { status: 409 });
+      ep.publishing.approvedAt = '';
+      ep.publishing.approvedBy = '';
+      ep.publishing.approvedHash = '';
+    });
+    store.episodes.audit(epId, 'publishing.revoked', { by });
+  }
+
+  /** 게시 기록 취소: only removes the "published" note (a wrong address, a post that was taken down); nothing is posted or deleted anywhere. */
+  async function clearPublished(epId, by = 'operator') {
+    await store.episodes.update(epId, (ep) => {
+      if (!ep.publishing || !ep.publishing.publishedAt) return;
+      ep.publishing.publishedAt = '';
+      ep.publishing.postUrl = '';
+    });
+    store.episodes.audit(epId, 'publishing.published_cleared', { by });
+  }
+
   async function setChecklist(epId, key, value) {
     if (!MANUAL_ITEMS.some(([k]) => k === key)) throw new StudioError('BAD_ITEM', '운영자가 확인하는 항목이 아닙니다.');
     await store.episodes.update(epId, (ep) => {
@@ -136,7 +158,7 @@ function createPublishingService({ store }) {
     store.episodes.audit(epId, 'publishing.marked_published', { postUrl, by });
   }
 
-  return { init, save, approve, setChecklist, markPublished, validate: (ep) => validate(ep, ep.publishing || {}), checklist };
+  return { init, save, approve, revoke, clearPublished, setChecklist, markPublished, validate: (ep) => validate(ep, ep.publishing || {}), checklist };
 }
 
 module.exports = { createPublishingService, generate, validate, checklist, affiliateUrlError, DISCLOSURE, MANUAL_ITEMS };
