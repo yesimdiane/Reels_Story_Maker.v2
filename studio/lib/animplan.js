@@ -69,6 +69,7 @@ function createAnimPlan({ store, router, sba, charRefs, lib }) {
       `SCENE ${sc.id} duration: ${sc.durationSec}s. Beats must stay inside 0–${sc.durationSec}s, start before they end, and every time is a multiple of 0.5.`,
       'VISUAL_DIRECTION: ' + String(sc.visual || ''),
       'ACTION: ' + String(sc.action || ''),
+      ...((sc.elements || []).filter((e) => e.type === 'camera').length ? ['CAMERA (operator choice — follow it): ' + (sc.elements || []).filter((e) => e.type === 'camera').map((e) => e.text).join('; ')] : []),
       'DIALOGUE: ' + (lines.join(' | ') || '(silent)'),
       'PREVIOUS_SCENE: ' + brief(ep.scenes[i - 1]), 'NEXT_SCENE: ' + brief(ep.scenes[i + 1]),
       'CAST (use these ids):', ...cast,

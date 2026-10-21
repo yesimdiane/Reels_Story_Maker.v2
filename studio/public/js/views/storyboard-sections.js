@@ -14,6 +14,19 @@ export function block(key, no, title, hint, ...kids) {
     ...kids);
 }
 
+// Camera MOVEMENT (for the video): same camera element mechanism, text "Camera movement: <name>"; one movement per scene, "Static" is the default (nothing stored)
+export const MOVES = [['static', 'Static', '고정'], ['pan_left', 'Pan Left', '패닝 왼쪽'], ['pan_right', 'Pan Right', '패닝 오른쪽'], ['tilt_up', 'Tilt Up', '틸트 위'], ['tilt_down', 'Tilt Down', '틸트 아래'], ['zoom_in', 'Zoom In', '줌 인'], ['zoom_out', 'Zoom Out', '줌 아웃'], ['dolly_in', 'Dolly In', '돌리 인'], ['dolly_out', 'Dolly Out', '돌리 아웃'], ['tracking', 'Tracking Shot', '트래킹'], ['handheld', 'Handheld', '핸드헬드']];
+const MOVE_PREFIX = 'Camera movement: ';
+export function moveChips(sc, dirty, redraw) {
+  const cur = (sc.elements || []).find((e) => e.type === 'camera' && String(e.text || '').startsWith(MOVE_PREFIX));
+  const curKey = cur ? (MOVES.find(([, en]) => cur.text === MOVE_PREFIX + en) || [])[0] : 'static';
+  return h('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap', 'data-move-chips': sc.id }, MOVES.map(([k, en, ko]) => h('button', { class: 'chip' + (curKey === k ? ' done' : ''), type: 'button', 'data-move-chip': k, title: ko, 'aria-pressed': curKey === k ? 'true' : 'false', onclick: () => {
+    sc.elements = (sc.elements || []).filter((e) => e !== cur);
+    if (k !== 'static') { let n = sc.elements.length + 1; while (sc.elements.some((e) => e.id === 'E' + n)) n += 1; sc.elements.push({ id: 'E' + n, type: 'camera', text: MOVE_PREFIX + en }); }
+    dirty(); redraw();
+  } }, `${en} · ${ko}`)));
+}
+
 /** shot-type chips: they add/replace one camera element on the scene (same `scene.elements` as Script Studio) */
 export function shotChips(sc, dirty, redraw) {
   const cur = (sc.elements || []).find((e) => e.type === 'camera' && SHOTS.some((s) => e.text.startsWith(s[1])));

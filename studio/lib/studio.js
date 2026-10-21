@@ -510,8 +510,9 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
     out.refImageId = String(p.refImageId || '').slice(0, 80);
     return out;
   }
-  function sanitizeScenes(list, old) {
+  function sanitizeScenes(list, old, allIds) {
     const seen = new Set();
+    const known = allIds || new Set(list.map((s, i) => String(s.id || 'S' + (i + 1)).trim()));
     return list.map((s, i) => {
       const id = String(s.id || 'S' + (i + 1)).trim();
       if (seen.has(id)) throw new StudioError('SCENE_DUP', '장면 ID가 중복됩니다: ' + id);
@@ -534,6 +535,7 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
         action: String(s.action != null ? s.action : prev.action || '').slice(0, 1500),
         emotion: String(s.emotion != null ? s.emotion : prev.emotion || '').slice(0, 200),
         look: sceneLook.cleanLook(s.look, prev.look),
+        sceneRefs: sceneLook.cleanSceneRefs(s.sceneRefs, id, known, prev.sceneRefs),
         pose: sceneLook.cleanPose(s.pose, prev.pose),
         referenceOnly: sceneLook.cleanReferenceOnly(s.referenceOnly, Array.isArray(s.characters) ? s.characters.map(String) : prev.characters || [], prev.referenceOnly),
         elements: sceneLook.cleanElements(s.elements, prev.elements, s.durationSec != null ? s.durationSec : prev.durationSec),
@@ -999,7 +1001,7 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
       if (!sc) throw new StudioError('NOT_FOUND', '장면을 찾을 수 없습니다: ' + sceneId, { status: 404 });
       const prevEp = F.isStructured(ep) ? JSON.parse(JSON.stringify(ep)) : null;
       const incoming = Object.assign({}, patch.scene || {}, { id: sceneId });
-      const [clean] = sanitizeScenes([incoming], [sc]);
+      const [clean] = sanitizeScenes([incoming], [sc], new Set(ep.scenes.map((x) => x.id)));
       // identity, order and position in the story never change from a scene save
       Object.assign(sc, clean, { id: sc.id, part: sc.part, beatKey: sc.beatKey, beat: sc.beat });
       if (incoming.elements !== undefined) { const dv = sceneLook.deriveText(sc.elements); if (dv) { sc.action = dv.action; sc.emotion = dv.emotion; } } // elements are the editable source; action/emotion mirror them

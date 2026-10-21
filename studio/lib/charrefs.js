@@ -122,18 +122,18 @@ function createCharRefs({ store, lib, router, aiSettings = () => ({}) }) {
    * The image-input limit check, run before every paid image request. Counts: all participating characters' selected references
    * (each up to 3) + the product reference images (separate). Never trims or swaps anything — it refuses and tells the user what to deselect.
    */
-  function enforce({ chars = [], product = [] }) {
+  function enforce({ chars = [], product = [], scenes = [] }) {
     const route = router.routeFor('imageGeneration');
     const lim = limitFor(route.provider, route.model, (aiSettings() || {}).refLimits);
     const charCount = chars.reduce((n, c) => n + c.refs.length, 0);
-    const total = charCount + product.length;
-    const all = chars.flatMap((c) => c.refs.map((r) => ({ type: 'character', characterId: c.characterId, name: c.name, assetId: r.assetId, filename: r.filename, url: r.url, bytes: r.bytes, mime: r.mime }))).concat(product.map((p) => ({ type: 'product', name: p.name || '제품', assetId: p.assetId, filename: p.filename || p.assetId, url: p.url || '', bytes: p.bytes, mime: p.mime })));
+    const total = charCount + product.length + scenes.length;
+    const all = chars.flatMap((c) => c.refs.map((r) => ({ type: 'character', characterId: c.characterId, name: c.name, assetId: r.assetId, filename: r.filename, url: r.url, bytes: r.bytes, mime: r.mime }))).concat(scenes.map((p) => ({ type: 'scene', name: p.name, assetId: p.assetId, filename: p.filename, url: p.url, bytes: p.bytes, mime: p.mime }))).concat(product.map((p) => ({ type: 'product', name: p.name || '제품', assetId: p.assetId, filename: p.filename || p.assetId, url: p.url || '', bytes: p.bytes, mime: p.mime })));
     const details = { limit: lim, total, characterCount: charCount, productCount: product.length, perCharacter: chars.map((c) => ({ characterId: c.characterId, name: c.name, count: c.refs.length })), refs: all };
     const bad = all.filter((r) => !lim.formats.includes(r.mime));
     if (bad.length) throw new StudioError('REF_FORMAT_UNSUPPORTED', `지원하지 않는 이미지 형식입니다: ${bad.map((b) => b.filename + ' (' + b.mime + ')').join(', ')}. 지원 형식: PNG, JPEG, WebP.`, { status: 409, details });
     const bytes = all.reduce((n, r) => n + (r.bytes || 0), 0);
     if (bytes > lim.maxTotalBytes) throw new StudioError('REF_TOO_LARGE', `선택한 참조 이미지의 합계 용량(${(bytes / 1048576).toFixed(1)} MB)이 요청 한도(${(lim.maxTotalBytes / 1048576).toFixed(0)} MB)를 넘습니다. 일부 참조를 이 요청에서 선택 해제하세요.`, { status: 409, details: Object.assign({ bytes }, details), recovery: '라이브러리의 선택은 바뀌지 않습니다.' });
-    if (lim.maxImages != null && total > lim.maxImages) throw new StudioError('REF_LIMIT_EXCEEDED', `선택한 참조 이미지 ${total}장(캐릭터 ${charCount}장 + 제품 ${product.length}장)이 ${route.model || route.provider}의 최대 ${lim.maxImages}장을 넘습니다. 이 요청에서 ${total - lim.maxImages}장 이상 선택 해제하세요.`, { status: 409, details, recovery: '캐릭터 라이브러리의 선택은 바뀌지 않으며, 자동으로 빼거나 다른 이미지로 바꾸지 않습니다.' });
+    if (lim.maxImages != null && total > lim.maxImages) throw new StudioError('REF_LIMIT_EXCEEDED', `선택한 참조 이미지 ${total}장(캐릭터 ${charCount}장 + 제품 ${product.length}장${scenes.length ? ' + 씬 이미지 ' + scenes.length + '장' : ''})이 ${route.model || route.provider}의 최대 ${lim.maxImages}장을 넘습니다. 이 요청에서 ${total - lim.maxImages}장 이상 선택 해제하세요.`, { status: 409, details, recovery: '캐릭터 라이브러리의 선택은 바뀌지 않으며, 자동으로 빼거나 다른 이미지로 바꾸지 않습니다.' });
     return details;
   }
 
