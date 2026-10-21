@@ -17,7 +17,7 @@ export function characters() {
   const full = state.summary.characters;
   const rerender = () => act(async () => null);
   const call = async (fn, ok) => { try { await fn(); if (ok) toast(ok); } catch (e) { toast(e.message, { error: true, recovery: e.recovery }); } await rerender(); };
-  const openUniverse = async (u) => { let t = []; try { t = (await api.get('/api/ending-templates')).templates; } catch (_) { /* optional */ } universeModal({ universe: u, endingTemplates: t, onDone: rerender }); };
+  const openUniverse = async (u) => { universeModal({ universe: u, onDone: rerender }); };
   const wrap = h('div', { class: 'stack', style: 'gap:20px', 'data-character-library': '' });
   wrap.append(pageHead('Character Library', '캐릭터 라이브러리', '유니버스(출연진 묶음)와 캐릭터 프로필을 한 곳에서 관리합니다. 프로필·참조 이미지 저장은 유료 호출이 없고, Story Lab에서 유니버스와 출연 캐릭터를 고릅니다.', h('button', { class: 'btn', type: 'button', 'data-new-universe': '', onclick: () => openUniverse(null) }, '＋ 새 유니버스')));
   U.forEach((u) => {

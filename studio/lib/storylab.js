@@ -127,8 +127,7 @@ function createStoryLab({ store, products, prompts, router, universes: getUniver
     const dur = raw && raw.estimatedDurationSec != null && raw.estimatedDurationSec !== '' ? Number(raw.estimatedDurationSec) : null;
     if (dur != null) {
       if (!(dur >= 5)) problems.push('예상 길이 오류');
-      else if (maxSec && dur > maxSec) problems.push(`예상 길이 ${Math.round(dur)}초가 최대 ${maxSec}초를 넘습니다`);
-      else out.estimatedDurationSec = Math.round(dur);
+      else out.estimatedDurationSec = Math.round(dur); // above the operator's max is only a guide: the AI is told to stay within it, a longer estimate is kept, never refused
     }
     claimHits(out.title + ' ' + out.storyline, product.forbiddenClaims || []).forEach((h) => problems.push(`확인되지 않은 제품 주장 "${h.claim}"`));
     if (/오빠/.test(out.title + ' ' + out.storyline)) problems.push('Diane이 Jack을 "오빠"라고 부르는 표현');

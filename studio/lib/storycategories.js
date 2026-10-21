@@ -44,7 +44,7 @@ const options = () => [
  * Validates a generation request and returns { category, count, plan } where plan lists the category of every concept to generate.
  * category is REQUIRED. 1–5 for a single category (default 1); "all" is always exactly 3 (a different count is refused, not silently changed).
  */
-/** maxDurationSec: the operator types a number of seconds (10–90, default 45); the AI is told to stay within it and longer concepts are refused. */
+/** maxDurationSec: the operator types a number of seconds (10–90, default 45); the AI is told to stay within it; going over it is only a guide (never a block). */
 function resolveDuration(v) {
   if (v == null || v === '') return DEFAULT_SEC;
   const n = Number(v);

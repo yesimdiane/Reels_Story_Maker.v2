@@ -6,7 +6,6 @@ import { api } from '../api.js';
 import { pageHead, charAvatar } from './common.js';
 import { aiIntegrations, promptManager, usagePanel } from './ai-settings.js';
 import { presetManager } from './script-prompt.js';
-import { endingManager } from './ending-settings.js';
 import { manychatCard } from './manychat-settings.js';
 import { refGallery } from './ref-gallery.js';
 import { voiceConnections } from './voice-connections.js';
@@ -244,11 +243,11 @@ function parts() {
 export const GROUPS = [
   ['general', '일반 · 비용', 'General & Cost', [['general', '일반'], ['costs', '모델 비용 · 지출 한도'], ['usage', '사용량 · 한도']]],
   ['ai', 'AI · 연동', 'AI & Integrations', [['ai', 'AI 제공자 · 작업별 배정'], ['connections', 'API 연결'], ['prompts', '프롬프트 관리'], ['autodm', '자동 DM']]],
-  ['media', '캐릭터 · 미디어', 'Characters & Media', [['characters', '캐릭터 라이브러리'], ['voices', '음성 연결 · 배정'], ['endings', '엔딩 템플릿']]],
+  ['media', '캐릭터 · 미디어', 'Characters & Media', [['characters', '캐릭터 라이브러리'], ['voices', '음성 연결 · 배정']]],
 ];
 const LEAVES = GROUPS.flatMap((g) => g[3].map((t) => t[0]));
 /** Old key 'scriptprompts' (the Script Studio presets) is now the second tool inside Prompt Management. */
-export const isSettingsTab = (k) => LEAVES.includes(k) || k === 'scriptprompts';
+export const isSettingsTab = (k) => LEAVES.includes(k) || k === 'scriptprompts' || k === 'endings';
 const groupOf = (tab) => GROUPS.find((g) => g[3].some((t) => t[0] === tab)) || GROUPS[0];
 const goTab = (tab) => { state.settingsTab = tab; try { history.replaceState(null, '', '#/settings/' + tab); } catch (_) { /* ignore */ } import('../state.js').then(({ hooks }) => hooks.rerender()); };
 
@@ -266,6 +265,7 @@ function promptManagement() {
 export function settings() {
   const wrap = h('div', { class: 'stack', style: 'gap:16px' });
   if (state.settingsTab === 'scriptprompts') { state.settingsTab = 'prompts'; state.promptTab = 'presets'; }
+  if (state.settingsTab === 'endings') state.settingsTab = 'general'; // the ending templates were removed with the fixed ending
   const tab = LEAVES.includes(state.settingsTab) ? state.settingsTab : 'general';
   const group = groupOf(tab);
   wrap.append(pageHead('Settings', '설정', 'API 키는 서버의 암호화 저장소에만 저장되며 이 화면에 다시 표시되지 않습니다. 키·모델·프롬프트·한도는 코드나 .env를 고치지 않고 여기서 바꿉니다.'));
@@ -280,7 +280,6 @@ export function settings() {
   else if (tab === 'prompts') wrap.append(promptManagement());
   else if (tab === 'autodm') wrap.append(autodmPanel());
   else if (tab === 'voices') wrap.append(voiceConnections());
-  else if (tab === 'endings') wrap.append(endingManager());
   else if (tab === 'characters') wrap.append(characters());
   else wrap.append(p.general);
   return wrap;

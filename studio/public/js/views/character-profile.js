@@ -35,16 +35,15 @@ export function profileModal({ character = null, universeId = 'jackdiane', unive
       } }, '프로필 저장'))), { wide: true });
 }
 
-export function universeModal({ universe = null, endingTemplates = [], onDone = () => {} } = {}) {
+export function universeModal({ universe = null, onDone = () => {} } = {}) {
   const u = universe || {};
-  const f = { name: u.name || '', description: u.description || '', storyStyle: u.storyStyle || '', language: u.language || 'en', visualStyle: u.visualStyle || '', endingTemplateId: u.endingTemplateId || '', active: u.active !== false };
+  const f = { name: u.name || '', description: u.description || '', storyStyle: u.storyStyle || '', language: u.language || 'en', visualStyle: u.visualStyle || '', active: u.active !== false };
   const field = (label, key, rows) => h('div', { class: 'field' }, h('label', null, label), rows ? h('textarea', { rows, value: f[key], oninput: (e) => (f[key] = e.target.value) }) : h('input', { type: 'text', value: f[key], oninput: (e) => (f[key] = e.target.value) }));
   return modal((close) => h('div', { class: 'stack', style: 'gap:10px', 'data-universe-modal': '' },
     h('h2', { style: 'margin:0' }, universe ? `${u.name} 편집` : '새 유니버스'),
     field('이름', 'name'), field('설명', 'description', 2), field('기본 스토리텔링 스타일', 'storyStyle', 2), field('시각 스타일', 'visualStyle', 2),
     h('div', { class: 'grid two' },
-      h('div', { class: 'field' }, h('label', null, '기본 언어'), h('select', { onchange: (e) => (f.language = e.target.value) }, [['en', '영어'], ['ko', '한국어']].map(([v, l]) => h('option', { value: v, selected: f.language === v }, l)))),
-      h('div', { class: 'field' }, h('label', null, '고정 엔딩 템플릿'), h('select', { onchange: (e) => (f.endingTemplateId = e.target.value) }, [h('option', { value: '' }, '(시리즈 기본)')].concat(endingTemplates.map((t) => h('option', { value: t.id, selected: f.endingTemplateId === t.id }, t.name)))))),
+      h('div', { class: 'field' }, h('label', null, '기본 언어'), h('select', { onchange: (e) => (f.language = e.target.value) }, [['en', '영어'], ['ko', '한국어']].map(([v, l]) => h('option', { value: v, selected: f.language === v }, l))))),
     h('label', { class: 'row small', style: 'gap:6px' }, h('input', { type: 'checkbox', checked: f.active, onchange: (e) => (f.active = e.target.checked) }), '활성 (Story Lab에서 선택 가능)'),
     h('div', { class: 'row end', style: 'gap:8px' }, h('button', { class: 'btn ghost', type: 'button', onclick: close }, '취소'),
       h('button', { class: 'btn sage', type: 'button', 'data-universe-save': '', onclick: async () => {
