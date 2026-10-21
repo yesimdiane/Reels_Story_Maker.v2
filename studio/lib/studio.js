@@ -1072,7 +1072,7 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
       const base = strip(src.title_ko);
       const cuts = ep.scenes.filter((s) => strip(s.title_ko) === base).length;
       const suffix = ` (컷 ${cuts + 1})`;
-      const title_ko = (base.slice(0, Math.max(0, 24 - suffix.length)) + suffix).trim();
+      const title_ko = (base.slice(0, Math.max(0, 60 - suffix.length)) + suffix).trim(); // the stored title limit is 60: never cut the original title in the middle of a word
       const sc = JSON.parse(JSON.stringify(src));
       delete sc.startImage; delete sc.origin;
       Object.assign(sc, { id: newId, title_ko, title: title_ko, manualEdit: true });
@@ -1091,6 +1091,23 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
     const v = episodeView(id);
     v.newSceneId = newId;
     return v;
+  }
+
+  /** 출연 자동 채우기: sets the visible cast of a scene from who speaks in it (and who its text names). Only known characters; never invents anyone. */
+  async function inferSceneCast(id, sceneId, by = 'operator') {
+    await store.episodes.update(id, (ep) => {
+      const sc = ep.scenes.find((x) => x.id === sceneId);
+      if (!sc) throw new StudioError('NOT_FOUND', '장면을 찾을 수 없습니다: ' + sceneId, { status: 404 });
+      const chars = lib().characters || store.characters.load().characters;
+      const names = Object.fromEntries(chars.map((c) => [c.id, [c.name, c.nameKo].filter(Boolean)]));
+      const guess = sceneLook.inferCast({ characters: sc.characters, speakers: ep.lines.filter((l) => l.sceneId === sceneId).map((l) => l.speaker), text: [sc.visual, sc.action].join('. ') }, new Set(chars.map((c) => c.id)), names);
+      if (!guess.length) throw new StudioError('CAST_NOT_FOUND', '대사와 설명에서 캐릭터를 찾지 못했습니다. 출연 캐릭터를 직접 선택하세요.', { status: 422 });
+      sc.characters = guess;
+      sc.referenceOnly = (sc.referenceOnly || []).filter((c) => !guess.includes(c));
+      sc.manualEdit = true;
+    }, { snapshot: true, by, note: `출연 자동 채우기 (${sceneId})` });
+    store.episodes.audit(id, 'scene.cast_inferred', { sceneId, by });
+    return episodeView(id);
   }
 
   /** Removes one scene and its dialogue. Clips, images, prompts and the approval history stay on disk (nothing is deleted). The last scene of a story beat cannot be removed. */
@@ -1589,7 +1606,7 @@ function createStudio({ cfg, store = createStore({ dir: cfg.studioDir }), provid
   return {
     exportName, sceneFlow, animGate, lipsync, uploadMusic, videoEdit, sfx, cfg, characterView, aiDiagnostics, store, video, gen, startImages, productAnalysis, charRefs, brollImages, animplan, renderReadiness, presets, voice, renderer, publishing, vault: keys, runtime, usage, prompts, router, products, storylab, universes, sceneRegen, voiceCatalog, scriptgen, integrations, createEpisodeFromConcept, migrateLegacy, projects, translator, cutPresets, saveInserts, cutFrame,
     saveOutfitLock, summary, episodeView, episodeIds, sba, performance, manychat, setEpisodeCategory, holdEpisode, resumeEpisode, assertNotHeld, editEpisode, providerStatus, createEpisode, saveScript, approveScript, revokeScript, restoreVersion, addSuggestion,
-    rebuildPrompts, savePrompt, setSceneTitle, reorderScenes, saveScene, addScene, duplicateScene, deleteScene, trashEpisode, restoreEpisode, trashList, archiveEpisode, unarchiveEpisode, episodeImpact, scriptVersions, deleteScriptVersion, undeleteScriptVersion, setStartImage, uploadStartFrame, approveStartFrame, deleteStartFrame, saveImagePrompt, resetImagePrompt, approveStoryboard, revokeStoryboard, saveAnimationSettings, addCustomModel, removeCustomModel, confirmModel, muapiCliModels, confirmMuapiTts, muapiCheck, setSpendLimit,
+    rebuildPrompts, savePrompt, setSceneTitle, reorderScenes, saveScene, addScene, duplicateScene, inferSceneCast, deleteScene, trashEpisode, restoreEpisode, trashList, archiveEpisode, unarchiveEpisode, episodeImpact, scriptVersions, deleteScriptVersion, undeleteScriptVersion, setStartImage, uploadStartFrame, approveStartFrame, deleteStartFrame, saveImagePrompt, resetImagePrompt, approveStoryboard, revokeStoryboard, saveAnimationSettings, addCustomModel, removeCustomModel, confirmModel, muapiCliModels, confirmMuapiTts, muapiCheck, setSpendLimit,
     updateCharacter, characterView, promptStatus: promptSvc.status, saveSettings, loadDemoReferences, uploadSfx, updateSfx, mediaFile,
   };
 }

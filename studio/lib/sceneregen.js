@@ -8,6 +8,7 @@
 const { StudioError, nowIso, sha256, canonical } = require('./util');
 const { checkTitleKo, validateScript, wordBudget } = require('./episode');
 const F = require('./formula');
+const sceneLook = require('./scenelook');
 
 function createSceneRegen({ store, storylab, router, universes, lib, charRefs, saveScene, assertNotHeld, log = () => {} }) {
   const running = new Set(); // `${episode}:${scene}` — one regeneration at a time per scene
@@ -72,7 +73,7 @@ function createSceneRegen({ store, storylab, router, universes, lib, charRefs, s
       '"visual" must be a second-by-second timeline in ENGLISH ("0.0–1.2 s: …") covering the whole durationSec; "action" = 1-2 sentences of movement. No dialogue and no on-screen text inside visual/action.',
       'title_ko: a short Korean scene title (3-12 characters) that describes what happens (never just "장면" or "컷").',
       'visual_ko / action_ko: a faithful Korean translation of "visual" and "action" for the operator to read (display only, never used for generation).',
-      'OUTPUT: return ONLY valid JSON: {"scene": {"title_ko": "…", "visual": "…", "visual_ko": "…", "action": "…", "action_ko": "…", "narration": "", "lines": [{"speaker": "<id>", "en": "English dialogue as spoken", "ko": "Korean subtitle"}]}}',
+      'OUTPUT: return ONLY valid JSON: {"scene": {"title_ko": "…", "look": {"background": "specific place (English)", "lighting": "…", "atmosphere": "…"}, "visual": "…", "visual_ko": "…", "action": "…", "action_ko": "…", "narration": "", "lines": [{"speaker": "<id>", "en": "English dialogue as spoken", "ko": "Korean subtitle"}]}}',
     ].join('\n');
     return { prompt, sc, cur };
   }
@@ -85,7 +86,7 @@ function createSceneRegen({ store, storylab, router, universes, lib, charRefs, s
 
   function validate(ep, sid, sc, raw) {
     if (!raw || typeof raw !== 'object') throw new StudioError('SCENE_REJECTED', 'AI가 장면 JSON을 반환하지 않았습니다. 원래 장면은 그대로입니다.', { status: 422 });
-    const out = { title_ko: String(raw.title_ko || sc.title_ko || '').trim(), visual: String(raw.visual || '').trim(), action: String(raw.action || '').trim(), visual_ko: String(raw.visual_ko || '').trim().slice(0, 1500), action_ko: String(raw.action_ko || '').trim().slice(0, 600), narration: String(raw.narration === undefined ? sc.narration || '' : raw.narration).trim(),
+    const out = { look: sceneLook.cleanLook({ background: raw.look && raw.look.background, lighting: raw.look && raw.look.lighting, atmosphere: raw.look && raw.look.atmosphere }), title_ko: String(raw.title_ko || sc.title_ko || '').trim(), visual: String(raw.visual || '').trim(), action: String(raw.action || '').trim(), visual_ko: String(raw.visual_ko || '').trim().slice(0, 1500), action_ko: String(raw.action_ko || '').trim().slice(0, 600), narration: String(raw.narration === undefined ? sc.narration || '' : raw.narration).trim(),
       lines: (Array.isArray(raw.lines) ? raw.lines : []).map((l) => ({ speaker: String(l.speaker || '').trim(), en: String(l.en || '').trim(), ko: String(l.ko || '').trim() })) };
     const problems = [];
     if (out.visual.length < 20) problems.push('시각 연출이 비어 있거나 너무 짧습니다.');
@@ -139,7 +140,7 @@ function createSceneRegen({ store, storylab, router, universes, lib, charRefs, s
     if (rec.baseHash !== baseHash(ep, sid)) throw new StudioError('STALE_PROPOSAL', '제안을 만든 뒤 이 씬이 수정되었습니다. 덮어쓰지 않았습니다. 다시 생성하거나 제안을 취소하세요.', { status: 409 });
     const sc = sceneOf(ep, sid);
     const p = rec.proposal;
-    await saveScene(epId, sid, { scene: { title_ko: p.title_ko, durationSec: sc.durationSec, characters: sc.characters, showsProduct: sc.showsProduct, visual: p.visual, action: p.action, narration: p.narration, placement: sc.placement }, lines: p.lines }, by);
+    await saveScene(epId, sid, { scene: { title_ko: p.title_ko, durationSec: sc.durationSec, characters: sc.characters, showsProduct: sc.showsProduct, look: p.look || sc.look, visual: p.visual, action: p.action, narration: p.narration, placement: sc.placement }, lines: p.lines }, by);
     await store.episodes.update(epId, (e) => { const m = Object.assign({}, e.sceneRegen); delete m[sid]; e.sceneRegen = m; });
     store.episodes.audit(epId, 'scene.regen.accepted', { sceneId: sid, by });
   }
