@@ -8,7 +8,10 @@ SRC=$(fc-list :lang=ko file 2>/dev/null | sed 's/: *$//; s/:.*//' | grep -iE '\.
 [ -z "$SRC" ] && SRC=$(fc-list :lang=ko file 2>/dev/null | sed 's/:.*//' | grep -iE '\.(ttf|otf)$' | head -1 || true)
 [ -z "$SRC" ] && SRC=$(fc-list file | sed 's/:.*//' | grep -iE '\.ttf$' | head -1)
 [ -n "$SRC" ] || { echo "no usable font found" >&2; exit 1; }
-mkdir -p "$HOME/.fonts"
-cp "$SRC" "$HOME/.fonts/NanumSquareRound-Regular.ttf"
+# RF_FONTS_DIR (the renderer reads it too) wins over ~/.fonts so a sandbox can keep fonts outside $HOME.
+DEST="${RF_FONTS_DIR:-$HOME/.fonts}"
+mkdir -p "$DEST"
+cp "$SRC" "$DEST/NanumSquareRound-Regular.ttf"
 fc-cache -f >/dev/null 2>&1 || true
-echo "stand-in font installed from: $SRC"
+echo "stand-in font installed from: $SRC -> $DEST"
+[ -z "${RF_FONTS_DIR:-}" ] || echo "run tests with RF_FONTS_DIR=$RF_FONTS_DIR"
