@@ -22,10 +22,26 @@ const DEFAULT_SETTINGS = {
   providers: { muapi: { mode: 'mock' }, heygen: { mode: 'mock' } },
 };
 
+/** Moves <dir>/<name> to <dir>/_retired/<name> (never overwriting an earlier retired copy). Returns the new path or ''. */
+function retireLegacyFile(dir, name) {
+  const from = path.join(dir, name);
+  if (!fs.existsSync(from)) return '';
+  const retired = path.join(dir, '_retired');
+  fs.mkdirSync(retired, { recursive: true });
+  let to = path.join(retired, name);
+  for (let i = 1; fs.existsSync(to); i++) to = path.join(retired, `${name}.${i}`);
+  fs.renameSync(from, to);
+  return to;
+}
+
 function createStore({ dir, seedDir = SEED_DIR }) {
   fs.mkdirSync(dir, { recursive: true });
   const queues = new Map();
   const p = (...parts) => path.join(dir, ...parts);
+
+  // The ending-templates module and tab were removed (#33). Move any leftover runtime file aside instead of
+  // deleting it, so nothing the operator wrote is lost; nothing reads it any more.
+  retireLegacyFile(dir, 'ending-templates.json');
 
   function checkId(id, what = 'ID') {
     if (!ID_RE.test(String(id))) throw new StudioError('BAD_ID', `${what} 형식이 올바르지 않습니다: ${id}`);

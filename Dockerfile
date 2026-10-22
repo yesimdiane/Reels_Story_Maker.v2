@@ -6,6 +6,13 @@ RUN apt-get update \
  && fc-cache -f \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
+# Optional brand caption font: --build-arg RF_FONT_URL=... --build-arg RF_FONT_SHA256=... (see scripts/install-fonts.sh).
+# Unset → skipped and captions use RF_FONT_NAME.
+ARG RF_FONT_URL=""
+ARG RF_FONT_SHA256=""
+COPY scripts/install-fonts.sh /tmp/install-fonts.sh
+RUN RF_FONT_URL="$RF_FONT_URL" RF_FONT_SHA256="$RF_FONT_SHA256" RF_FONTS_DIR=/usr/local/share/fonts/rf bash /tmp/install-fonts.sh \
+ && rm /tmp/install-fonts.sh
 COPY package.json ./
 COPY renderer ./renderer
 COPY studio ./studio
@@ -15,6 +22,7 @@ ENV NODE_ENV=production \
     RF_STUDIO_DIR=/data/studio \
     RF_STATE_DIR=/data/state \
     RF_FONT_NAME="NanumGothic" \
+    RF_FONTS_DIR=/usr/local/share/fonts/rf \
     PORT=8080
 # The entrypoint starts as root only to fix volume ownership, then drops to uid 10001 (user rf).
 RUN useradd -m -u 10001 rf && mkdir -p /data && chown -R rf /data /app && chmod +x /app/scripts/docker-entrypoint.sh
